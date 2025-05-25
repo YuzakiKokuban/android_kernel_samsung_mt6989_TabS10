@@ -2322,25 +2322,13 @@ int __weak module_frob_arch_sections(Elf_Ehdr *hdr,
 
 /* module_blacklist is a comma-separated list of module names */
 static char *module_blacklist;
-static char *custom_module_blacklist[] = {
-#if IS_BUILTIN(CONFIG_CRYPTO_LZO)
-    "lzo", "lzo_rle",
-#endif
-#if IS_BUILTIN(CONFIG_ZRAM)
-    "zram",
-#endif
-#if IS_BUILTIN(CONFIG_ZSMALLOC)
-    "zsmalloc",
-#endif
-};
 static bool blacklisted(const char *module_name)
 {
 	const char *p;
 	size_t len;
-    int i;
 
 	if (!module_blacklist)
-		goto custom_blacklist;
+		return false;
 
 	for (p = module_blacklist; *p; p += len) {
 		len = strcspn(p, ",");
@@ -2349,12 +2337,6 @@ static bool blacklisted(const char *module_name)
 		if (p[len] == ',')
 			len++;
 	}
-
-custom_blacklist:
-	for (i = 0; i < ARRAY_SIZE(custom_module_blacklist); i++)
-		if (!strcmp(module_name, custom_module_blacklist[i]))
-			return true;
-
 	return false;
 }
 core_param(module_blacklist, module_blacklist, charp, 0400);
@@ -2858,7 +2840,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	 * if it's blacklisted.
 	 */
 	if (blacklisted(info->name)) {
-		// err = -EPERM;
+		err = -EPERM;
 		pr_err("Module %s is blacklisted\n", info->name);
 		goto free_copy;
 	}
