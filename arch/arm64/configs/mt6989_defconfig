@@ -7206,7 +7206,6 @@ CONFIG_CRYPTO_CRC32C=y
 CONFIG_CRYPTO_CRC32=y
 # CONFIG_CRYPTO_CRCT10DIF is not set
 # end of CRCs (cyclic redundancy checks)
-=y
 #
 # Compression
 #
