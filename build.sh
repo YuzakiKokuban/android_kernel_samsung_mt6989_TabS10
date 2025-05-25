@@ -16,7 +16,7 @@ TARGET_DEFCONFIG=${1:-mt6989_defconfig}
 cd "$(dirname "$0")"
 
 
-LOCALVERSION=-android14-Kokuban-Exusiai-AXI9-LKM
+LOCALVERSION=-android14-Kokuban-Exusiai-AXI9-KSU
 
 if [ "$LTO" == "thin" ]; then
   LOCALVERSION+="-thin"
