@@ -162,7 +162,7 @@ kernel_release=$(cat ../include/config/kernel.release)
 final_name="${ZIP_NAME_PREFIX}_${kernel_release}_$(date '+%Y%m%d')"
 
 echo "--- 正在创建 Zip 刷机包: ${final_name}.zip ---"
-zip -r9 "../${final_name}.zip" . -x "*.zip" "tools/*" "Image"
+zip -r9 "../${final_name}.zip" . -x "*.zip"
 
 echo "--- 正在创建 boot.img: ${final_name}.img ---"
 # 复制最终的 zImage 用于制作 boot.img
