@@ -15,11 +15,11 @@ LOCALVERSION_BASE=-android14-Kokuban-Exusiai-AXI9-SukiSUU
 
 # 3. LTO (Link Time Optimization)
 # 设置为 "full", "thin" 或 "" (留空以禁用)
-LTO="full"
+LTO=""
 
 # 4. 工具链路径
 # 指向你的工具链的 'prebuilts' 目录
-TOOLCHAIN_DIR=$(realpath "/home/kokuban/PlentyofToolchain/toolchainTS10/prebuilts")
+TOOLCHAIN=$(realpath "/home/kokuban/PlentyofToolchain/toolchainTS10/prebuilts")
 
 # 5. AnyKernel3 打包配置
 ANYKERNEL_REPO="https://github.com/YuzakiKokuban/AnyKernel3.git"
@@ -35,11 +35,9 @@ cd "$(dirname "$0")"
 
 # --- 环境和路径设置 ---
 echo "--- 正在设置工具链环境 ---"
-export PATH="$TOOLCHAIN_DIR/build-tools/linux-x86/bin:$PATH"
-export PATH="$TOOLCHAIN_DIR/build-tools/path/linux-x86:$PATH"
-export PATH="$TOOLCHAIN_DIR/clang/host/linux-x86/clang-r487747c/bin:$PATH"
-export KBUILD_BUILD_USER="Kokuban"
-export KBUILD_BUILD_HOST="Kokuban-PC"
+export PATH=$TOOLCHAIN/build-tools/linux-x86/bin:$PATH
+export PATH=$TOOLCHAIN/build-tools/path/linux-x86:$PATH
+export PATH=$TOOLCHAIN/clang/host/linux-x86/clang-r487747c/bin:$PATH
 
 # =============================== 核心编译参数 ===============================
 # 直接使用基础版本号，构建系统会自动处理后续部分
@@ -105,12 +103,12 @@ fi
 # 5. 开始编译内核
 echo "--- 开始编译内核 (-j$(nproc)) ---"
 # 将编译日志同时输出到屏幕和 build.log 文件
-make -j$(nproc) ${MAKE_ARGS} 2>&1 | tee build.log
+make -j$(nproc) ${MAKE_ARGS} 2>&1 | tee kernel_build_log.txt
 BUILD_STATUS=${PIPESTATUS[0]}
 
 if [ $BUILD_STATUS -ne 0 ]; then
     echo "--- 内核编译失败！ ---"
-    echo "请检查 'build.log' 文件以获取更多错误信息。"
+    echo "请检查 'kernel_build_log.txt' 文件以获取更多错误信息。"
     exit 1
 fi
 
@@ -171,7 +169,7 @@ cd tools
 chmod +x libmagiskboot.so
 lz4 boot.img.lz4
 ./libmagiskboot.so repack boot.img
-mv boot.img "../../${final_name}.img"
+mv new-boot.img "../../${final_name}.img"
 cd ../.. # 返回到 out 目录
 
 echo "======================================================"
