@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * linux/fs/stat.c
+ *  linux/fs/stat.c
  *
- * Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
 #include <linux/blkdev.h>
@@ -18,19 +18,12 @@
 #include <linux/syscalls.h>
 #include <linux/pagemap.h>
 #include <linux/compat.h>
-#if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MOUNT)
-#include <linux/susfs_def.h>
-#endif
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
 
 #include "internal.h"
 #include "mount.h"
-
-#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat);
-#endif
 
 /**
  * generic_fillattr - Fill in the basic attributes from the inode struct
@@ -51,17 +44,6 @@ extern void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *
 void generic_fillattr(struct user_namespace *mnt_userns, struct inode *inode,
 		      struct kstat *stat)
 {
-#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
-	if (likely(current->susfs_task_state & TASK_STRUCT_NON_ROOT_USER_APP_PROC) &&
-			unlikely(inode->i_state & INODE_STATE_SUS_KSTAT)) {
-		susfs_sus_ino_for_generic_fillattr(inode->i_ino, stat);
-		stat->mode = inode->i_mode;
-		stat->rdev = inode->i_rdev;
-		stat->uid = i_uid_into_mnt(mnt_userns, inode);
-		stat->gid = i_gid_into_mnt(mnt_userns, inode);
-		return;
-	}
-#endif
 	stat->dev = inode->i_sb->s_dev;
 	stat->ino = inode->i_ino;
 	stat->mode = inode->i_mode;
@@ -232,28 +214,13 @@ int getname_statx_lookup_flags(int flags)
  *
  * 0 will be returned on success, and a -ve error code if unsuccessful.
  */
-
-#ifdef CONFIG_KSU_SUSFS_SUS_SU
-extern bool susfs_is_sus_su_hooks_enabled __read_mostly;
-extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
-#endif
-
 static int vfs_statx(int dfd, struct filename *filename, int flags,
 	      struct kstat *stat, u32 request_mask)
 {
 	struct path path;
 	unsigned int lookup_flags = getname_statx_lookup_flags(flags);
 	int error;
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-	struct mount *mnt;
-#endif
 
-#ifdef CONFIG_KSU_SUSFS_SUS_SU
-	if (susfs_is_sus_su_hooks_enabled) {
-		// FIX: Pass &filename->name instead of &filename
-		ksu_handle_stat(&dfd, &filename->name, &flags);
-	}
-#endif
 	if (flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH |
 		      AT_STATX_SYNC_TYPE))
 		return -EINVAL;
@@ -264,15 +231,8 @@ retry:
 		goto out;
 
 	error = vfs_getattr(&path, stat, request_mask, flags);
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-	mnt = real_mount(path.mnt);
-	if (likely(current->susfs_task_state & TASK_STRUCT_NON_ROOT_USER_APP_PROC)) {
-		for (; mnt->mnt_id >= DEFAULT_SUS_MNT_ID; mnt = mnt->mnt_parent) {}
-	}
-	stat->mnt_id = mnt->mnt_id;
-#else
+
 	stat->mnt_id = real_mount(path.mnt)->mnt_id;
-#endif
 	stat->result_mask |= STATX_MNT_ID;
 
 	if (path.mnt->mnt_root == path.dentry)
