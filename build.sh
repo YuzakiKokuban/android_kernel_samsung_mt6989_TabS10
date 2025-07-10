@@ -19,7 +19,7 @@ LTO=""
 
 # 4. 工具链路径
 # 指向你的工具链的 'prebuilts' 目录
-TOOLCHAIN=$(realpath "/home/kokuban/PlentyofToolchain/toolchainTS10/prebuilts")
+TOOLCHAIN=$(realpath "./toolchain")
 
 # 5. AnyKernel3 打包配置
 ANYKERNEL_REPO="https://github.com/YuzakiKokuban/AnyKernel3.git"
