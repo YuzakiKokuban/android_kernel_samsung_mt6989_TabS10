@@ -26,7 +26,7 @@ ZIP_NAME_PREFIX="TabS10_kernel"
 
 # 7. GitHub Release 配置
 # 替换成你自己的 "用户名/仓库名"
-GITHUB_REPO="YuzakiKokuban/Your-Kernel-Repo" 
+GITHUB_REPO="YuzakiKokuban/android_kernel_samsung_mt6989_TabS10" 
 # 设置为 true 以启用自动发布，设置为 false 或留空以禁用
 AUTO_RELEASE=true
 
