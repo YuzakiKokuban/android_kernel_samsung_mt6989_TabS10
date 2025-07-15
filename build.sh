@@ -181,6 +181,9 @@ if [ -z "$GH_TOKEN" ]; then
     exit 1
 fi
 
+# 临时禁用 "exit on error" 以便捕获 gh 的具体错误信息
+set +e
+
 # 使用 gh 登录 (gh 会自动使用 GH_TOKEN)
 echo "$GH_TOKEN" | gh auth login --with-token
 if [ $? -ne 0 ]; then
@@ -201,9 +204,6 @@ echo "  - ${ZIP_FILE_PATH}"
 echo "  - ${IMG_FILE_PATH}"
 
 echo "--- 准备执行发布命令 ---"
-
-# 临时禁用 "exit on error" 以便捕获 gh 的具体错误信息
-set +e
 
 # 执行命令，并将标准错误(2)重定向到标准输出(1)，然后将所有输出捕获到变量中
 RELEASE_OUTPUT=$(gh release create "$TAG" \
