@@ -26,7 +26,7 @@ ZIP_NAME_PREFIX="TabS10_kernel"
 
 # 7. GitHub Release 配置
 # 替换成你自己的 "用户名/仓库名"
-GITHUB_REPO="YuzakiKokuban/android_kernel_samsung_mt6989_TabS10" 
+GITHUB_REPO="YuzakiKokuban/Your-Kernel-Repo" 
 # 设置为 true 以启用自动发布，设置为 false 或留空以禁用
 AUTO_RELEASE=true
 
@@ -158,9 +158,9 @@ echo "Boot 镜像输出到: ${IMG_FILE_PATH}"
 echo "======================================================"
 
 
-echo "======================================================"
-echo "--- 自动发布到 GitHub Release ---"
-echo "======================================================"
+# ======================================================================
+# --- 自动发布到 GitHub Release ---
+# ======================================================================
 if [ "$AUTO_RELEASE" != "true" ]; then
     echo "--- 已跳过自动发布到 GitHub Release ---"
     exit 0
@@ -200,6 +200,9 @@ echo "上传文件: "
 echo "  - ${ZIP_FILE_PATH}"
 echo "  - ${IMG_FILE_PATH}"
 
+# 开启详细命令追踪，方便调试
+set -x
+
 # 创建 Release 并上传产物
 gh release create "$TAG" \
     "$ZIP_FILE_PATH" \
@@ -208,10 +211,18 @@ gh release create "$TAG" \
     --title "$RELEASE_TITLE" \
     --notes "$RELEASE_NOTES"
 
-if [ $? -eq 0 ]; then
+# 检查上一个命令的退出状态码
+RELEASE_STATUS=$?
+
+# 关闭详细命令追踪
+set +x
+
+if [ $RELEASE_STATUS -eq 0 ]; then
     echo -e "\n--- 成功发布到 GitHub Release！ ---"
 else
-    echo -e "\n--- 发布到 GitHub Release 失败！ ---"
+    echo -e "\n--- 发布到 GitHub Release 失败！---"
+    echo "gh 命令返回了错误码: $RELEASE_STATUS"
+    echo "请检查上面的输出日志以获取详细错误信息。"
     exit 1
 fi
 
