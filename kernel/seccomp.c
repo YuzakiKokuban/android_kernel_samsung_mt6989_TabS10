@@ -36,6 +36,10 @@
 #include <asm/syscall.h>
 #endif
 
+#if defined(CONFIG_SECURITY_DSMS) && defined(CONFIG_SECURITY_KUMIHO)
+#include <linux/dsms.h>
+#endif
+
 #ifdef CONFIG_SECCOMP_FILTER
 #include <linux/file.h>
 #include <linux/filter.h>
@@ -951,9 +955,8 @@ static u32 seccomp_actions_logged = SECCOMP_LOG_KILL_PROCESS |
 				    SECCOMP_LOG_TRACE |
 				    SECCOMP_LOG_LOG;
 
-// SEC_PRODUCT_FEATURE_SECURITY_SUPPORT_DSMS {
+/* SEC_PRODUCT_FEATURE_SECURITY_SUPPORT_DSMS { */
 #if defined(CONFIG_SECURITY_DSMS) && defined(CONFIG_SECURITY_KUMIHO)
-#include <linux/dsms.h>
 
 /* append_string_s: append simple string to a buffer
  * @target: pointer to a string, which is updated on success to
@@ -1061,10 +1064,10 @@ static int append_string(char **target, int *available_size,
  * Returns 0 if all arguments were formatted and completely copied, 1 otherwise
  */
 static int append_string_f(char **target, int *available_size,
-			char *aux_buffer, int aux_buffer_size,
+			char *aux_buffer, size_t aux_buffer_size,
 			int quote_escape, const char *format, ...)
 {
-	int vsnp_ret;
+	size_t vsnp_ret;
 	va_list ap;
 
 	va_start(ap, format);
@@ -1144,7 +1147,7 @@ struct syscall_api {
 
 /* Specialized formatter for some kinds of socket address */
 static int dump_sockaddr(char **buffer, int *buffer_size,
-		char *aux_buffer, int aux_buffer_size,
+		char *aux_buffer, size_t aux_buffer_size,
 		const struct sockaddr *s_addr, int addr_len)
 {
 	int ne = append_string_f(buffer, buffer_size,
@@ -1154,13 +1157,11 @@ static int dump_sockaddr(char **buffer, int *buffer_size,
 	if (!ne)
 		switch (s_addr->sa_family) {
 		case AF_UNIX:
-			if (addr_len >= sizeof(struct sockaddr_un)) {
-				struct sockaddr_un *s_un =
-					(struct sockaddr_un *)s_addr;
-				ne |= append_string_f(buffer, buffer_size,
-					aux_buffer, aux_buffer_size, 0,
-					" UN \"%s\"", s_un->sun_path);
-			}
+			/*
+			 * Do not log the sendmsg system call when
+			 * its socket family is AF_UNIX.
+			 */
+			ne = -1;
 			break;
 		case AF_INET:
 			if (addr_len >= sizeof(struct sockaddr_in)) {
@@ -1189,12 +1190,12 @@ static int dump_sockaddr(char **buffer, int *buffer_size,
 
 /* Specialized formatter for struct msghdr */
 static int dump_msghdr(char **buffer, int *buffer_size,
-		char *aux_buffer, int aux_buffer_size,
+		char *aux_buffer, size_t aux_buffer_size,
 		const struct user_msghdr *msg, int user_flags)
 {
 	int ne = append_string_f(buffer, buffer_size, aux_buffer,
 			aux_buffer_size, 0,
-			" namelen %d iovlen %lu controllen %lu flags %u uflags %llu",
+			" namelen %d iovlen %lu controllen %zu flags %u uflags %d",
 			msg->msg_namelen, msg->msg_iovlen,
 			msg->msg_controllen, msg->msg_flags, user_flags);
 
@@ -1225,7 +1226,7 @@ static int dump_msghdr(char **buffer, int *buffer_size,
 
 				ne |= append_string_f(buffer, buffer_size,
 						bbuffer, sizeof(bbuffer), 0,
-						" M%d(%d):", i, part_len);
+						" M%d(%zu):", i, part_len);
 				if (ne)
 					break;
 				if (part_len > DUMP_MAX)
@@ -1323,9 +1324,9 @@ static int dump_sendmsg(char **buffer, int *buffer_size,
 			ne |= append_string_f(buffer, buffer_size,
 					sbuffer, BUFFER_SZ, 0,
 					" (socket lookup failed %d)", err);
-			if (ne)
-				goto end;
 		}
+		if (ne)
+			goto end;
 	}
 	ne = append_string_s(buffer, buffer_size, "}", 0);
 	if (!ne && sd->args[1]) {
@@ -1366,8 +1367,9 @@ static int dump_syscall_default(char **buffer, int *buffer_size,
 							buffer, buffer_size, "args", &ne);
 			if (u_buffersz) {
 				if (append_string_s(buffer, buffer_size, " ", 0) ||
-					append_string(buffer, buffer_size, u_bufferp, u_buffersz, quote))
-						ne = 1;
+					append_string(buffer, buffer_size, u_bufferp,
+						u_buffersz, quote))
+					ne = 1;
 			}
 			kfree(u_bufferp);
 			if (ne)
@@ -1389,7 +1391,7 @@ static int dump_syscall_default(char **buffer, int *buffer_size,
  * @buffer: target string
  * @buffer_size: target size, including terminator
  * @sd: seccomp invocation descriptor
- * Returns 0 if successful, 1 if text was clipped
+ * Returns 0 if successful, 1 if text was clipped, -1 if not to log
  */
 static int dump_syscall_base(char *buffer, int buffer_size,
 				const struct seccomp_data *sd)
@@ -1398,43 +1400,21 @@ static int dump_syscall_base(char *buffer, int buffer_size,
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
 	static struct syscall_api apis[] = {
-		{__NR_read, "read", 3},
-		{__NR_write, "write", 3},
-		#ifdef __NR_open
-		{__NR_open, "open", 3, AS0},
-		#endif
-		{__NR_close, "close", 1},
-		#ifdef __NR_stat
-		{__NR_stat, "stat", 2, AS0},
-		#endif
-		{__NR_fstat, "fstat", 2},
-		#ifdef __NR_lstat
-		{__NR_lstat, "lstat", 2, AS0},
-		#endif
+		/*
+		 * The next lines are examples of how to specify formatters
+		 * depending on syscall parameters
+		 *		{__NR_read, "read", 3},
+		 *		{__NR_write, "write", 3},
+		 *		{__NR_open, "open", 3, AS0},
+		 *		{__NR_close, "close", 1},
+		 *		#ifdef __NR_renameat
+		 *		{__NR_renameat, "renameat", 4, AS1 | AS3},
+		 *		#endif
+		 */
 		{__NR_sendto, "sendto", 6},
 		{__NR_sendmsg, "sendmsg", 3, 0, dump_sendmsg},
-		#ifdef __NR_unlinkat
-		{__NR_unlinkat, "unlinkat", 3, AS1},
-		#endif
-		#ifdef __NR_renameat
-		{__NR_renameat, "renameat", 4, AS1 | AS3},
-		#endif
-		#ifdef __NR_statfs
-		{__NR_statfs, "statfs", 2, AS0},
-		#endif
-		#ifdef __NR_faccessat
-		{__NR_faccessat, "faccessat", 3, AS1},
-		#endif
-		#ifdef __NR_chmodat
-		{__NR_fchmodat, "fchmodat", 3, AS1},
-		#endif
-		#ifdef __NR_openat
-		{__NR_openat, "openat", 4, AS1},
-		#endif
-		#ifdef __NR_readlinkat
-		{__NR_readlinkat, "readlinkat", 4, AS1},
-		#endif
 	};
+
 #pragma GCC diagnostic pop
 
 	char sbuffer[100];
@@ -1478,19 +1458,24 @@ static int dump_syscall_base(char *buffer, int buffer_size,
  * @command: command of process invoking syscall
  * @signr: signal number
  * @sd: nonnull pointer to seccomp descriptor
+ * Returns 0 if successful, 1 if text was clipped, -1 if not to log
  */
-static void dump_syscall(char *buffer, int buffer_size, const char *command,
+static int dump_syscall(char *buffer, int buffer_size, const char *command,
 			long signr, const struct seccomp_data *sd)
 {
 	int n_copied = snprintf(buffer, buffer_size,
 			"seccomp '%s' signum %ld pid %d uid %d ",
 			command, signr, current->pid, current_uid().val);
+
 	n_copied = n_copied < buffer_size
 		?  dump_syscall_base(buffer + n_copied, buffer_size - n_copied,
 				sd)
 		: 1;
-	if (n_copied) // something was truncated
-		strcpy(buffer + buffer_size - 4, "...");
+
+	if (n_copied > 0) // something was truncated
+		strscpy(buffer + buffer_size - 4, "...", sizeof("..."));
+
+	return n_copied;
 }
 
 #define MSG_SZ 1024  // Limit actually set by DSMS
@@ -1505,13 +1490,18 @@ noinline void seccomp_notify_dsms(unsigned long syscall, long signr, u32 action,
 	get_task_comm(comm_buf, main_thread);
 	if (unlikely(strncmp("kumihodecoder", comm_buf, sizeof(main_thread->comm)) == 0)) {
 		char *msg = kcalloc(1, MSG_SZ, GFP_KERNEL);
-		int i;
+		int i, dump_status;
 
 		if (msg) {
-			dump_syscall(msg, MSG_SZ, comm_buf, signr, sd);
-			i = dsms_send_message("KMH0", msg, action);
-			if (unlikely(i != DSMS_SUCCESS))
-				pr_warn("%s::dsms_send_message failed: error %d msg <%s>\n", __func__, i, msg);
+			dump_status = dump_syscall(msg, MSG_SZ, comm_buf, signr, sd);
+
+			if (dump_status >= 0) {
+				i = dsms_send_message("KMH0", msg, action);
+				if (unlikely(i != DSMS_SUCCESS))
+					pr_warn("%s::dsms_send_message failed: error %d msg <%s>\n",
+							__func__, i, msg);
+			}
+
 			kfree(msg);
 		} else
 			pr_warn("%s: out of memory", __func__);
@@ -1523,7 +1513,7 @@ noinline void seccomp_notify_dsms(unsigned long syscall, long signr, u32 action,
 #else
 #define seccomp_notify_dsms(syscall, signumber, action, sd) /* nothing */
 #endif
-// SEC_PRODUCT_FEATURE_SECURITY_SUPPORT_DSMS }
+/* SEC_PRODUCT_FEATURE_SECURITY_SUPPORT_DSMS } */
 
 static inline void seccomp_log(unsigned long syscall, long signr, u32 action,
 			       bool requested, const struct seccomp_data *sd)

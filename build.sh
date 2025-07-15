@@ -11,7 +11,7 @@ MAIN_DEFCONFIG=mt6989_defconfig
 
 # 2. 内核版本标识
 # 构建系统会自动附加 git commit hash
-LOCALVERSION_BASE=-android14-Kokuban-Exusiai-AXIC-SukiSUU
+LOCALVERSION_BASE=-android14-Kokuban-Exusiai-BYE1-SukiSUU
 
 # 3. LTO (Link Time Optimization)
 # 设置为 "full", "thin" 或 "" (留空以禁用)
@@ -19,7 +19,7 @@ LTO=""
 
 # 4. 工具链路径
 # 指向你的工具链的 'prebuilts' 目录
-TOOLCHAIN=$(realpath "./toolchain")
+TOOLCHAIN=$(realpath "/home/kokuban/PlentyofToolchain/toolchainTS10/prebuilts")
 
 # 5. AnyKernel3 打包配置
 ANYKERNEL_REPO="https://github.com/YuzakiKokuban/AnyKernel3.git"

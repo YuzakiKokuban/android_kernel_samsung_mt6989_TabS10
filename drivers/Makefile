@@ -193,5 +193,3 @@ obj-$(CONFIG_UH)		+= uh/
 obj-y				+= knox/
 
 include $(KCONFIG_EXT_PREFIX)Makefile.ext
-
-obj-$(CONFIG_KSU) += kernelsu/

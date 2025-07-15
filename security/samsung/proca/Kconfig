@@ -60,7 +60,6 @@ config PROCA_CERT_USER
 config PROCA_CERT_DEVICE
 	bool "PROCA certificate device"
 	depends on PROCA_CERTIFICATES_DB && !SAMSUNG_PRODUCT_SHIP
-	default y if PROCA_CERTIFICATES_DB && !SAMSUNG_PRODUCT_SHIP
 	default n
 	help
 	   Enable the certificate device /dev/proca_cert for reading and
@@ -69,7 +68,7 @@ config PROCA_CERT_DEVICE
 config PROCA_DEBUG
 	bool "PROCA Debug mode"
 	depends on PROCA && !SAMSUNG_PRODUCT_SHIP
-	default y
+	default n
 	help
 	   Enable the debug mode in the PROCA. When this option is enabled
 	   PROCA driver creates file /proc/<pid>/integrity/proca_certificate
