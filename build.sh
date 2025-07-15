@@ -200,29 +200,39 @@ echo "上传文件: "
 echo "  - ${ZIP_FILE_PATH}"
 echo "  - ${IMG_FILE_PATH}"
 
-# 开启详细命令追踪，方便调试
-set -x
+echo "--- 准备执行发布命令 ---"
 
-# 创建 Release 并上传产物
-gh release create "$TAG" \
+# 临时禁用 "exit on error" 以便捕获 gh 的具体错误信息
+set +e
+
+# 执行命令，并将标准错误(2)重定向到标准输出(1)，然后将所有输出捕获到变量中
+RELEASE_OUTPUT=$(gh release create "$TAG" \
     "$ZIP_FILE_PATH" \
     "$IMG_FILE_PATH" \
     --repo "$GITHUB_REPO" \
     --title "$RELEASE_TITLE" \
-    --notes "$RELEASE_NOTES"
+    --notes "$RELEASE_NOTES" 2>&1)
 
-# 检查上一个命令的退出状态码
+# 获取 gh 命令的退出状态码
 RELEASE_STATUS=$?
 
-# 关闭详细命令追踪
-set +x
+# 重新启用 "exit on error"
+set -e
 
+# 检查状态码
 if [ $RELEASE_STATUS -eq 0 ]; then
     echo -e "\n--- 成功发布到 GitHub Release！ ---"
+    echo "gh 命令输出:"
+    echo "$RELEASE_OUTPUT"
 else
     echo -e "\n--- 发布到 GitHub Release 失败！---"
     echo "gh 命令返回了错误码: $RELEASE_STATUS"
-    echo "请检查上面的输出日志以获取详细错误信息。"
+    echo "--- 错误详情 ---"
+    echo "$RELEASE_OUTPUT"
+    echo "--------------------"
+    echo "请检查上面的错误信息。最常见的原因是："
+    echo "1. GITHUB_REPO ('$GITHUB_REPO') 配置错误或仓库不存在。"
+    echo "2. GitHub Token 权限不足 (需要 'contents: write' 权限)。"
     exit 1
 fi
 
