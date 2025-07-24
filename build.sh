@@ -3,7 +3,7 @@
 # 脚本出错时立即退出
 set -e
 
-# --- 用户配置 ---
+# --- 用户配置 (TabS10) ---
 
 # 1. 主配置文件
 MAIN_DEFCONFIG=mt6989_defconfig
@@ -15,7 +15,7 @@ LOCALVERSION_BASE=-android14-Kokuban-Exusiai-BYE1-SukiSUU
 LTO=""
 
 # 4. 工具链路径
-TOOLCHAIN=$(realpath "/home/kokuban/PlentyofToolchain/toolchainTS10/prebuilts")
+TOOLCHAIN=$(realpath "./toolchain/prebuilts")
 
 # 5. AnyKernel3 打包配置
 ANYKERNEL_REPO="https://github.com/YuzakiKokuban/AnyKernel3.git"
@@ -25,18 +25,20 @@ ANYKERNEL_BRANCH="mt6989"
 ZIP_NAME_PREFIX="TabS10_kernel"
 
 # 7. GitHub Release 配置
-# 替换成你自己的 "用户名/仓库名"
-GITHUB_REPO="YuzakiKokuban/android_kernel_samsung_mt6989_TabS10" 
-# 设置为 true 以启用自动发布，设置为 false 或留空以禁用
+GITHUB_REPO="YuzakiKokuban/android_kernel_samsung_mt6989_TabS10"
 AUTO_RELEASE=true
+# 优先使用环境变量，如果没有则默认为 true
+IS_PRERELEASE=${IS_PRERELEASE:-true}
+PATCH_LINUX=true
+
 
 # --- 脚本开始 ---
 
-# 切换到脚本所在目录 (通常是内核源码根目录)
+# 切换到脚本所在目录 (内核源码根目录)
 cd "$(dirname "$0")"
 
-# --- 环境和路径设置 ---
-echo "--- 正在设置工具链环境 ---"
+# --- 环境和路径设置 (TabS10) ---
+echo "--- 正在设置 TabS10 工具链环境 ---"
 export PATH=$TOOLCHAIN/build-tools/linux-x86/bin:$PATH
 export PATH=$TOOLCHAIN/build-tools/path/linux-x86:$PATH
 export PATH=$TOOLCHAIN/clang/host/linux-x86/clang-r487747c/bin:$PATH
@@ -48,7 +50,6 @@ ARCH=arm64
 CC=clang
 LLVM=1
 LLVM_IAS=1
-LOCALVERSION=${LOCALVERSION_BASE}
 "
 # ======================================================================
 
@@ -65,8 +66,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 3. 后处理配置 (禁用三星/GKI等安全特性)
-echo "--- 正在禁用部分内核特性 (RKP, KDP, etc.) ---"
+# 3. 后处理配置 (禁用三星安全特性)
+echo "--- 正在禁用三星安全特性 (RKP, KDP, etc.) ---"
 ./scripts/config --file out/.config \
   -d UH -d RKP -d KDP -d SECURITY_DEFEX -d INTEGRITY -d FIVE \
   -d TRIM_UNUSED_KSYMS -d PROCA -d PROCA_GKI_10 -d PROCA_S_OS \
@@ -87,7 +88,7 @@ fi
 
 # 5. 开始编译内核
 echo "--- 开始编译内核 (-j$(nproc)) ---"
-make -j$(nproc) ${MAKE_ARGS} 2>&1 | tee kernel_build_log.txt
+make -j$(nproc) ${MAKE_ARGS} LOCALVERSION="${LOCALVERSION_BASE}" 2>&1 | tee kernel_build_log.txt
 BUILD_STATUS=${PIPESTATUS[0]}
 
 if [ $BUILD_STATUS -ne 0 ]; then
@@ -103,12 +104,16 @@ echo "--- 正在准备打包环境 ---"
 cd out
 
 if [ ! -d AnyKernel3 ]; then
-  echo "--- 正在克隆 AnyKernel3 仓库 ---"
+  echo "--- 正在克隆 AnyKernel3 仓库 (分支: ${ANYKERNEL_BRANCH}) ---"
   git clone --depth=1 "${ANYKERNEL_REPO}" -b "${ANYKERNEL_BRANCH}" AnyKernel3
 fi
 
 cp arch/arm64/boot/Image AnyKernel3/Image
 cd AnyKernel3
+
+if [ "$PATCH_LINUX" == "false" ]; then
+    rm -f patch_linux
+fi
 
 echo "--- 正在运行 patch_linux ---"
 if [ ! -f "patch_linux" ]; then
@@ -138,24 +143,34 @@ final_name="${ZIP_NAME_PREFIX}_${kernel_release}_$(date '+%Y%m%d')"
 echo "--- 正在创建 Zip 刷机包: ${final_name}.zip ---"
 zip -r9 "../${final_name}.zip" . -x "*.zip"
 
-echo "--- 正在创建 boot.img: ${final_name}.img ---"
-cp zImage tools/kernel
-cd tools
-chmod +x libmagiskboot.so
-lz4 boot.img.lz4
-./libmagiskboot.so repack boot.img
-mv new-boot.img "../../${final_name}.img"
-cd ../.. # 返回到 out 目录
+ZIP_FILE_PATH=$(realpath "../${final_name}.zip")
+UPLOAD_FILES="$ZIP_FILE_PATH"
 
-# 获取产物的绝对路径
-ZIP_FILE_PATH=$(realpath "${final_name}.zip")
-IMG_FILE_PATH=$(realpath "${final_name}.img")
+if [ "$CI" != "true" ]; then
+    echo "--- 正在创建 boot.img: ${final_name}.img ---"
+    cp zImage tools/kernel
+    cd tools
+    chmod +x libmagiskboot.so
+    lz4 boot.img.lz4
+    ./libmagiskboot.so repack boot.img
+    mv new-boot.img "../../${final_name}.img"
+    cd ../..
 
-echo "======================================================"
-echo "成功！"
-echo "刷机包输出到: ${ZIP_FILE_PATH}"
-echo "Boot 镜像输出到: ${IMG_FILE_PATH}"
-echo "======================================================"
+    IMG_FILE_PATH=$(realpath "${final_name}.img")
+    UPLOAD_FILES="$UPLOAD_FILES $IMG_FILE_PATH"
+
+    echo "======================================================"
+    echo "成功！"
+    echo "刷机包输出到: ${ZIP_FILE_PATH}"
+    echo "Boot 镜像输出到: ${IMG_FILE_PATH}"
+    echo "======================================================"
+else
+    cd ../..
+    echo "======================================================"
+    echo "成功！ (已跳过创建 .img)"
+    echo "刷机包输出到: ${ZIP_FILE_PATH}"
+    echo "======================================================"
+fi
 
 
 # ======================================================================
@@ -168,58 +183,45 @@ fi
 
 echo -e "\n--- 开始发布到 GitHub Release ---"
 
-# 检查 gh 命令是否存在
 if ! command -v gh &> /dev/null; then
-    echo "错误: 未找到 'gh' 命令。请先安装 GitHub CLI 并确保它在你的 PATH 中。"
+    echo "错误: 未找到 'gh' 命令。请先安装 GitHub CLI。"
     exit 1
 fi
 
-# 检查 GitHub Token 是否已设置
 if [ -z "$GH_TOKEN" ]; then
     echo "错误: 环境变量 'GH_TOKEN' 未设置。"
-    echo "请先设置你的 GitHub Personal Access Token 以进行身份验证。"
     exit 1
 fi
 
-# 临时禁用 "exit on error" 以便捕获 gh 的具体错误信息
-set +e
-
-# 使用 gh 登录 (gh 会自动使用 GH_TOKEN)
-echo "$GH_TOKEN" | gh auth login --with-token
-if [ $? -ne 0 ]; then
-    echo "错误: 使用 GH_TOKEN 登录 GitHub 失败。"
-    exit 1
-fi
-
-# 创建一个唯一的标签名
-TAG="release-$(date +%Y%m%d-%H%M%S)"
+BUILD_TYPE=${LOCALVERSION_BASE##*-}
+TAG="release-${BUILD_TYPE}-$(date +%Y%m%d-%H%M%S)"
 RELEASE_TITLE="新内核构建 - ${kernel_release} ($(date +'%Y-%m-%d %R'))"
 RELEASE_NOTES="由构建脚本在 $(date) 自动发布。"
+
+PRERELEASE_FLAG=""
+if [ "$IS_PRERELEASE" == "true" ]; then
+    PRERELEASE_FLAG="--prerelease"
+    RELEASE_TITLE="[预发布] ${RELEASE_TITLE}"
+    echo "--- 将发布为 Pre-release ---"
+fi
 
 echo "仓库: $GITHUB_REPO"
 echo "标签: $TAG"
 echo "标题: $RELEASE_TITLE"
-echo "上传文件: "
-echo "  - ${ZIP_FILE_PATH}"
-echo "  - ${IMG_FILE_PATH}"
+echo "上传文件: $UPLOAD_FILES"
 
 echo "--- 准备执行发布命令 ---"
 
-# 执行命令，并将标准错误(2)重定向到标准输出(1)，然后将所有输出捕获到变量中
+set +e
 RELEASE_OUTPUT=$(gh release create "$TAG" \
-    "$ZIP_FILE_PATH" \
-    "$IMG_FILE_PATH" \
+    $UPLOAD_FILES \
     --repo "$GITHUB_REPO" \
     --title "$RELEASE_TITLE" \
-    --notes "$RELEASE_NOTES" 2>&1)
-
-# 获取 gh 命令的退出状态码
+    --notes "$RELEASE_NOTES" \
+    $PRERELEASE_FLAG 2>&1)
 RELEASE_STATUS=$?
-
-# 重新启用 "exit on error"
 set -e
 
-# 检查状态码
 if [ $RELEASE_STATUS -eq 0 ]; then
     echo -e "\n--- 成功发布到 GitHub Release！ ---"
     echo "gh 命令输出:"
@@ -228,11 +230,11 @@ else
     echo -e "\n--- 发布到 GitHub Release 失败！---"
     echo "gh 命令返回了错误码: $RELEASE_STATUS"
     echo "--- 错误详情 ---"
-    echo "$RELEASE_OUTPUT"
+    echo "$OUTPUT"
     echo "--------------------"
-    echo "请检查上面的错误信息。最常见的原因是："
+    echo "请检查错误信息。常见原因："
     echo "1. GITHUB_REPO ('$GITHUB_REPO') 配置错误或仓库不存在。"
-    echo "2. GitHub Token 权限不足 (需要 'contents: write' 权限)。"
+    echo "2. GitHub Token 无效或权限不足 (需要 'contents: write' 权限)。"
     exit 1
 fi
 
