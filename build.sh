@@ -141,7 +141,7 @@ kernel_release=$(cat ../include/config/kernel.release)
 final_name="${ZIP_NAME_PREFIX}_${kernel_release}_$(date '+%Y%m%d')"
 
 echo "--- 正在创建 Zip 刷机包: ${final_name}.zip ---"
-zip -r9 "../${final_name}.zip" . -x "*.zip"
+zip -r9 "../${final_name}.zip" . -x "*.zip" -x "tools/boot.img.lz4" -x "tools/libmagiskboot.so"
 
 ZIP_FILE_PATH=$(realpath "../${final_name}.zip")
 UPLOAD_FILES="$ZIP_FILE_PATH"
