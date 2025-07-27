@@ -106,6 +106,7 @@ jobs:
       - name: Stage new files to avoid dirty tag
         run: |
           git add .
+          git commit -a
 
       # 第八步：运行构建和发布脚本
       - name: Run Build and Release Script
