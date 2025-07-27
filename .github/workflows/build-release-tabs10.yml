@@ -3,14 +3,11 @@ name: Build Kernel & Release (TabS10)
 
 # 工作流的触发条件
 on:
-  # 允许你手动在 Actions 页面点击 "Run workflow" 来触发
   workflow_dispatch:
-    # 添加输入字段
     inputs:
       branch:
         description: '选择要编译的分支'
         required: true
-        # !! 关键改动：将输入框改为下拉选择框 !!
         type: choice
         options:
           - main
@@ -26,15 +23,16 @@ on:
 
 jobs:
   build:
-    # 指定运行环境为最新的 Ubuntu 系统
     runs-on: ubuntu-latest
+    env:
+      # 明确指定 ccache 的缓存目录
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
 
     steps:
       # 第一步：检出你的仓库代码
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # 使用你手动输入的分支
           ref: ${{ github.event.inputs.branch }}
           submodules: 'recursive'
 
@@ -44,36 +42,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential git libncurses5-dev bc bison flex libssl-dev \
-            p7zip-full lz4 cpio curl libelf-dev dwarves
+            p7zip-full lz4 cpio curl libelf-dev dwarves ccache
 
-      # 第三步：下载、合并并解压 TabS10 工具链
+      # 第三步：缓存工具链
+      - name: Cache Toolchain
+        id: toolchain-cache
+        uses: actions/cache@v4
+        with:
+          path: ./toolchain
+          key: ${{ runner.os }}-toolchain-tabs10-${{ hashFiles('**/build-release.yml') }}
+
+      # 第四步：下载、合并并解压 TabS10 工具链
       - name: Download and Extract Toolchain (TabS10)
+        if: steps.toolchain-cache.outputs.cache-hit != 'true'
         run: |
-          echo "开始从 GitHub Releases 下载 TabS10 工具链分卷..."
-          # 下载 TabS10 的分卷
+          echo "未找到工具链缓存，开始下载..."
           wget -O toolchain.part00 "https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases/download/toolchain/toolchainS10.tar.gz.001"
           wget -O toolchain.part01 "https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases/download/toolchain/toolchainS10.tar.gz.002"
           
           echo "合并所有分卷..."
-          # 使用 cat 命令将所有分卷合并成一个完整的 .tar.gz 文件
           cat toolchain.part* > toolchain.tar.gz
 
-          echo "创建临时解压目录并开始解压..."
-          mkdir -p ./toolchain_temp
-          tar -xzvf toolchain.tar.gz -C ./toolchain_temp/
-          
-          echo "移动文件到正确的工具链目录..."
+          echo "创建并解压到工具链目录..."
           mkdir -p ./toolchain
-          # 根据你的描述，解压后是 prebuilts 目录，我们将其移动到 toolchain 目录下
-          mv ./toolchain_temp/prebuilts ./toolchain/
+          tar -xzvf toolchain.tar.gz -C ./toolchain/
           
-          echo "清理下载和临时文件..."
+          echo "清理下载文件..."
           rm toolchain.part* toolchain.tar.gz
-          rm -rf ./toolchain_temp
           
           echo "工具链准备完毕。"
+          
+      # 第五步：缓存 ccache 编译结果
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-ccache-${{ github.event.inputs.branch }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
 
-      # 第四步：根据分支设置 KernelSU
+      # 第六步：根据分支设置 KernelSU
       - name: Setup KernelSU based on branch
         run: |
           BRANCH_NAME="${{ github.event.inputs.branch }}"
@@ -94,23 +102,18 @@ jobs:
           
           echo "KernelSU 设置步骤完成。"
 
-      # 第五步：暂存新文件以避免 -dirty 后缀
+      # 第七步：暂存新文件以避免 -dirty 后缀
       - name: Stage new files to avoid dirty tag
         run: |
-          echo "Staging new files to make the git repository clean..."
           git add .
-          echo "Git status after staging:"
-          git status
 
-      # 第六步：运行构建和发布脚本
+      # 第八步：运行构建和发布脚本
       - name: Run Build and Release Script
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           IS_PRERELEASE: ${{ github.event.inputs.is_prerelease }}
+          TARGET_BRANCH: ${{ github.event.inputs.branch }}
         run: |
-          echo "赋予构建脚本执行权限..."
           chmod +x ./build.sh
-          
-          echo "开始执行构建和发布脚本..."
           ./build.sh
 
