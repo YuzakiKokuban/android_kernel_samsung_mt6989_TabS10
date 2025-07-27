@@ -2,3 +2,5 @@
 kernel_build_log.txt
 /KernelSU
 /out
+/.ccache/
+toolchain/
