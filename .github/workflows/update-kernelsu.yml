@@ -2,9 +2,7 @@
 name: Update KernelSU Sources & Version
 
 on:
-  # 允许你手动在 Actions 页面点击 "Run workflow" 来触发
   workflow_dispatch:
-    # 定义手动触发时的输入参数
     inputs:
       branch:
         description: '要更新并推送到的分支名'
@@ -21,12 +19,8 @@ on:
 
 jobs:
   update-sources:
-    # 任务名称
     name: Run Setup, Record Version, and Push Changes
-    # 指定运行环境
     runs-on: ubuntu-latest
-
-    # 为这个任务授予写入代码的权限
     permissions:
       contents: write
 
@@ -54,19 +48,13 @@ jobs:
           
           if [[ -n "$KSU_REPO_URL" ]]; then
             echo "正在从 $KSU_REPO_URL 获取最新的 Commit ID..."
-            # 克隆 KernelSU 仓库到一个临时目录
             git clone --depth=1 "$KSU_REPO_URL" temp_ksu
-            # 进入临时目录，获取短格式的 Commit ID
             COMMIT_ID=$(cd temp_ksu && git rev-parse --short HEAD)
-            # 返回并清理
             rm -rf temp_ksu
             
-            # 将 Commit ID 写入版本文件
             echo "$COMMIT_ID" > KERNELSU_VERSION.txt
             echo "已将 KernelSU 的 Commit ID ($COMMIT_ID) 写入 KERNELSU_VERSION.txt 文件。"
           else
-            echo "当前分支不需要记录 KernelSU 版本，跳过此步骤。"
-            # 如果是不相关的分支，确保版本文件不存在
             rm -f KERNELSU_VERSION.txt
           fi
 
@@ -99,7 +87,6 @@ jobs:
             echo "检测到文件变动，正在提交并推送..."
             git add .
             COMMIT_MSG="ci: 更新 KernelSU (${{ github.event.inputs.kernelsu_type }})"
-            # 如果版本文件存在，将 Commit ID 也加入到提交信息中
             if [ -f "KERNELSU_VERSION.txt" ]; then
               KSU_COMMIT=$(cat KERNELSU_VERSION.txt)
               COMMIT_MSG="$COMMIT_MSG at $KSU_COMMIT"
