@@ -25,7 +25,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # 明确指定 ccache 的缓存目录
       CCACHE_DIR: ${{ github.workspace }}/.ccache
 
     steps:
@@ -102,13 +101,18 @@ jobs:
           
           echo "KernelSU 设置步骤完成。"
 
-      # 第七步：暂存新文件以避免 -dirty 后缀
+      # !! 新增步骤：明确显示文件变动 !!
+      - name: Show file changes
+        run: |
+          echo "运行 git status 来追踪文件变化..."
+          git status
+
+      # 第八步：暂存新文件以避免 -dirty 后缀
       - name: Stage new files to avoid dirty tag
         run: |
           git add .
-          git commit -a
 
-      # 第八步：运行构建和发布脚本
+      # 第九步：运行构建和发布脚本
       - name: Run Build and Release Script
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
