@@ -55,3 +55,4 @@ void __show_mem(unsigned int filter, nodemask_t *nodemask, int max_zone_idx)
 	pr_info("%s: %lu kB\n", "HugepagePool", K(total_hugepage_pool_pages()));
 #endif
 }
+EXPORT_SYMBOL_GPL(__show_mem);

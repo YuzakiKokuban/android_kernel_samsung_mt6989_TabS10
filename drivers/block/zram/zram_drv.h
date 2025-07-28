@@ -76,6 +76,18 @@ struct zram_table_entry {
 #endif
 };
 
+#ifdef CONFIG_ZRAM_PERF_STAT
+#define NR_IO_TYPES 2
+
+struct zram_perf_stat {
+	ktime_t start;
+	atomic64_t nr_io;
+	atomic64_t nr_pages;
+	atomic64_t time;
+	atomic64_t cnt;
+};
+#endif
+
 struct zram_stats {
 	atomic64_t compr_data_size;	/* compressed size of pages stored */
 	atomic64_t num_reads;	/* failed + successful */
@@ -112,6 +124,9 @@ struct zram_stats {
 	atomic64_t bd_objreads;
 	atomic64_t bd_objwrites;
 	atomic64_t lru_pages;
+#endif
+#ifdef CONFIG_ZRAM_PERF_STAT
+	struct zram_perf_stat perf_stat[NR_IO_TYPES];
 #endif
 };
 
@@ -255,6 +270,9 @@ struct zram {
 	unsigned long *read_req_bitmap;
 	unsigned long nr_lru_pages;
 	u16 *wb_table;
+#endif
+#ifdef CONFIG_ZRAM_PERF_STAT
+	bool perf_stat_enabled;
 #endif
 };
 #endif

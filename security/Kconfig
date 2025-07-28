@@ -263,6 +263,13 @@ config LSM
 
 	  If unsure, leave this as the default.
 
+config KZT
+	bool "Enable Knox Zero Trust"
+	default n
+	help
+	  To have the Knox Zero Trust be fully functioning,
+	  some kernel support is required.
+
 source "security/Kconfig.hardening"
 
 endmenu

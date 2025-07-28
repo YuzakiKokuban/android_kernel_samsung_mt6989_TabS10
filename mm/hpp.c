@@ -438,6 +438,9 @@ struct page *alloc_zeroed_hugepage(gfp_t gfp_mask)
 	enum zone_type high_zoneidx;
 	struct page *page = NULL;
 
+	if (gfp_mask != GFP_TRANSHUGE_LIGHT)
+		return NULL;
+
 	if (hpp_state != HPP_ACTIVATED)
 		return NULL;
 

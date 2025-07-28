@@ -150,7 +150,6 @@ extern int security_integrity_current(void);
 extern struct cred *prepare_ro_creds(struct cred *old, int kdp_cmd, u64 p);
 
 extern void kdp_assign_pgd(struct task_struct *p);
-extern inline int kdp_restrict_fork(struct filename *path);
 extern void kdp_free_security(unsigned long tsec);
 
 extern int is_kdp_protect_addr(unsigned long addr);

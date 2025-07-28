@@ -157,6 +157,85 @@ static inline bool zram_allocated(struct zram *zram, u32 index)
 			zram_test_flag(zram, index, ZRAM_WB);
 }
 
+#ifdef CONFIG_ZRAM_PERF_STAT
+static void zram_perf_io_end(struct zram_wb_work *zw, int rw)
+{
+	struct zram *zram = zw->zram;
+	struct zram_perf_stat *perf_stat = &zram->stats.perf_stat[rw];
+	unsigned long nr_pages;
+	ktime_t delta;
+
+	if (!zram->perf_stat_enabled)
+		return;
+
+	if (zw->nr_pages != NR_ZWBS)
+		return;
+
+	nr_pages = atomic64_add_return(NR_ZWBS, &perf_stat->nr_pages);
+	if (atomic64_dec_return(&perf_stat->nr_io))
+		return;
+
+	delta = ktime_sub(ktime_get_boottime(), perf_stat->start);
+	atomic64_add(delta, &perf_stat->time);
+	atomic64_add(nr_pages, &perf_stat->cnt);
+	atomic64_sub(nr_pages, &perf_stat->nr_pages);
+}
+
+static void zram_perf_io_start(struct zram_wb_work *zw, int rw)
+{
+	struct zram *zram = zw->zram;
+	struct zram_perf_stat *perf_stat = &zram->stats.perf_stat[rw];
+
+	if (!zram->perf_stat_enabled)
+		return;
+
+	if (zw->nr_pages != NR_ZWBS)
+		return;
+
+	if (atomic64_inc_return(&perf_stat->nr_io) == 1)
+		perf_stat->start = ktime_get_boottime();
+}
+
+static ssize_t perf_stat_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+	ssize_t ret = 0;
+	int i;
+	u64 cnt, time, tp;
+
+	if (!zram->perf_stat_enabled)
+		return ret;
+
+	for (i = 0; i < NR_IO_TYPES; i++) {
+		cnt = atomic64_read(&zram->stats.perf_stat[i].cnt);
+		time = atomic64_read(&zram->stats.perf_stat[i].time);
+		tp = cnt * NSEC_PER_SEC * PAGE_SIZE / 1024 / 1024 / time;
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret,
+				"%5s: %8llu MB/s\n", i ? "WRITE" : "READ", tp);
+	}
+	return ret;
+}
+
+static ssize_t perf_stat_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram *zram = dev_to_zram(dev);
+	int i;
+	bool val;
+
+	if (!kstrtobool(buf, &val)) {
+		zram->perf_stat_enabled = val;
+		for (i = 0; i < NR_IO_TYPES; i++)
+			memset(&zram->stats.perf_stat[i], 0x00,
+					sizeof(struct zram_perf_stat));
+	}
+	return len;
+}
+
+static DEVICE_ATTR_RW(perf_stat);
+#endif
+
 #if PAGE_SIZE != 4096
 static inline bool is_partial_io(struct bio_vec *bvec)
 {
@@ -1143,6 +1222,9 @@ static void zram_writeback_page_end_io(struct bio *bio)
 	if (errno)
 		pr_info("%s errno %d\n", __func__, errno);
 
+#ifdef CONFIG_ZRAM_PERF_STAT
+	zram_perf_io_end(zw, WRITE);
+#endif
 	INIT_WORK(&zw->work, zram_writeback_done_work);
 	schedule_work(&zw->work);
 }
@@ -1183,6 +1265,9 @@ static int zram_writeback_page(struct zram *zram, struct zram_writeback_buffer *
 	for (i = 0; i < NR_ZWBS; i++)
 		bio_add_page(bio, zwbs[i]->page, PAGE_SIZE, 0);
 
+#ifdef CONFIG_ZRAM_PERF_STAT
+	zram_perf_io_start(zw, WRITE);
+#endif
 	submit_bio(bio);
 	return 0;
 out:
@@ -1634,9 +1719,15 @@ static void zram_handle_comp_page(struct work_struct *work)
 	unsigned int page_idx = 0;
 	int header_sz = sizeof(struct zram_wb_header);
 	int ret = 0;
+	int errno = blk_status_to_errno(bio->bi_status);
 	u32 index;
 	u8 *src, *dst, *src_decomp;
 	bool spanned;
+
+	if (errno) {
+		pr_err("%s submit_bio errno %d\n", __func__, errno);
+		goto out_err;
+	}
 
 	if (is_ppr_idx(zram, blk_idx)) {
 		page_idx = blk_idx & ~ZWBS_ALIGN_MASK;
@@ -1685,13 +1776,14 @@ out_huge:
 	kunmap_atomic(dst);
 	if (!spanned)
 		kunmap_atomic(src);
-
+out_err:
 	if (zw->bio_chain)
 		bio_endio(zw->bio_chain);
 out:
 	bio_put(bio);
 
-	zram_handle_remain(zram, src_page, blk_idx, zw->nr_pages);
+	if (!errno)
+		zram_handle_remain(zram, src_page, blk_idx, zw->nr_pages);
 
 	if (!dst_page)
 		clear_bit(blk_to_chunk_idx(blk_idx), zram->read_req_bitmap);
@@ -1705,10 +1797,10 @@ static void zram_comp_page_end_io(struct bio *bio)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
 	struct zram_wb_work *zw = (struct zram_wb_work *)page_private(page);
-	int errno = blk_status_to_errno(bio->bi_status);
 
-	if (errno)
-		pr_err("%s submit_bio errno %d\n", __func__, errno);
+#ifdef CONFIG_ZRAM_PERF_STAT
+	zram_perf_io_end(zw, READ);
+#endif
 	INIT_WORK(&zw->work, zram_handle_comp_page);
 	schedule_work(&zw->work);
 }
@@ -1763,6 +1855,9 @@ static int read_comp_from_bdev(struct zram *zram, struct bio_vec *bvec,
 		bio_chain(zw->bio_chain, parent);
 	}
 
+#ifdef CONFIG_ZRAM_PERF_STAT
+	zram_perf_io_start(zw, READ);
+#endif
 	submit_bio(bio);
 	return 1;
 }
@@ -2969,6 +3064,9 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_bd_stat.attr,
 #endif
 	&dev_attr_debug_stat.attr,
+#ifdef CONFIG_ZRAM_PERF_STAT
+	&dev_attr_perf_stat.attr,
+#endif
 	NULL,
 };
 
@@ -3493,6 +3591,11 @@ static void deinit_ramplus(struct zram *zram)
 	spin_unlock_irqrestore(&zram->wb_table_lock, flags);
 
 	kvfree(wb_table);
+	unregister_trace_android_vh_smaps_pte_entry(zram_count_entry_type, zram);
+	unregister_trace_android_vh_show_smap(zram_show_entry_type, zram);
+	unregister_trace_android_vh_madvise_swapin_walk_pmd_entry(zram_request_prefetch, zram);
+	unregister_trace_android_vh_madvise_pageout_swap_entry(zram_request_writeback, zram);
+	unregister_trace_android_vh_process_madvise_end(zram_process_madvise_end, zram);
 }
 
 static int init_ramplus(struct zram *zram, unsigned long nr_pages)
@@ -3541,6 +3644,11 @@ static int init_ramplus(struct zram *zram, unsigned long nr_pages)
 	}
 	INIT_WORK(&zram->ramplus[POOL].work, zram_fill_request_pool);
 	zram->wb_limit_enable = true;
+	register_trace_android_vh_smaps_pte_entry(zram_count_entry_type, zram);
+	register_trace_android_vh_show_smap(zram_show_entry_type, zram);
+	register_trace_android_vh_madvise_swapin_walk_pmd_entry(zram_request_prefetch, zram);
+	register_trace_android_vh_madvise_pageout_swap_entry(zram_request_writeback, zram);
+	register_trace_android_vh_process_madvise_end(zram_process_madvise_end, zram);
 
 	return 0;
 out:
@@ -3673,13 +3781,6 @@ static int zram_add(void)
 	pr_info("Added device: %s\n", zram->disk->disk_name);
 	register_trace_android_vh_show_mem(zram_show_mem, zram);
 	register_trace_android_vh_meminfo_proc_show(zram_meminfo, zram);
-#ifdef CONFIG_ZRAM_RAMPLUS
-	register_trace_android_vh_smaps_pte_entry(zram_count_entry_type, zram);
-	register_trace_android_vh_show_smap(zram_show_entry_type, zram);
-	register_trace_android_vh_madvise_swapin_walk_pmd_entry(zram_request_prefetch, zram);
-	register_trace_android_vh_madvise_pageout_swap_entry(zram_request_writeback, zram);
-	register_trace_android_vh_process_madvise_end(zram_process_madvise_end, zram);
-#endif
 
 	return device_id;
 
@@ -3704,13 +3805,6 @@ static int zram_remove(struct zram *zram)
 
 	unregister_trace_android_vh_show_mem(zram_show_mem, zram);
 	unregister_trace_android_vh_meminfo_proc_show(zram_meminfo, zram);
-#ifdef CONFIG_ZRAM_RAMPLUS
-	unregister_trace_android_vh_smaps_pte_entry(zram_count_entry_type, zram);
-	unregister_trace_android_vh_show_smap(zram_show_entry_type, zram);
-	unregister_trace_android_vh_madvise_swapin_walk_pmd_entry(zram_request_prefetch, zram);
-	unregister_trace_android_vh_madvise_pageout_swap_entry(zram_request_writeback, zram);
-	unregister_trace_android_vh_process_madvise_end(zram_process_madvise_end, zram);
-#endif
 
 	claimed = zram->claim;
 	if (!claimed)

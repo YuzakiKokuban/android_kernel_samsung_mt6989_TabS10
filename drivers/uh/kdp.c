@@ -505,31 +505,6 @@ static inline bool is_kdp_invalid_cred_sp(u64 cred, u64 sec_ptr)
 
 	return false;
 }
-
-inline int kdp_restrict_fork(struct filename *path)
-{
-	struct cred *shellcred;
-	const struct cred_kdp *cred_kdp = (const struct cred_kdp *)(current->cred);
-
-	if (!strcmp(path->name, "/system/bin/patchoat") ||
-		!strcmp(path->name, "/system/bin/idmap2")) {
-		return 0;
-	}
-
-	if ((cred_kdp->type) >> 1 & 1) {
-		shellcred = prepare_creds();
-		if (!shellcred)
-			return 1;
-
-		shellcred->uid.val = 2000;
-		shellcred->gid.val = 2000;
-		shellcred->euid.val = 2000;
-		shellcred->egid.val = 2000;
-
-		commit_creds(shellcred);
-	}
-	return 0;
-}
 #endif
 
 /* This function is related to Namespace */

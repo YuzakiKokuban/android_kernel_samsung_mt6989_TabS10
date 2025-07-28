@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018 Samsung Electronics Co., Ltd. All Rights Reserved
  *
@@ -6,7 +7,7 @@
  * as published by the Free Software Foundation.
  */
 
-#if 0
+#ifdef __NEVER_DEFINED__
 	/* Rules start after this line */
 	{feature_ped_exception,"/system/bin/run-as"},	/* DEFAULT */
 	{feature_ped_exception,"/system/bin/dumpstate"},	/* DEFAULT */
@@ -167,8 +168,13 @@
 	{feature_safeplace_path,"/system/bin/bc"},
 	{feature_safeplace_path,"/system/bin/service"},
 	{feature_safeplace_path,"/system/bin/fsck_msdos"},
+	{feature_safeplace_path,"/vendor/bin/hcgcd"},
+	{feature_safeplace_path,"/vendor/bin/qlm-service"},
 	{feature_safeplace_path,"/system/bin/rdxd"},
 	{feature_safeplace_path,"/system/bin/ztd"},
+	{feature_safeplace_path,"/system/bin/fsck.exfat_sec"},
+	{feature_safeplace_path,"/system/bin/mkfs.exfat_sec"},
+	{feature_safeplace_path,"/system/bin/ksmbd.tools"},
 	{feature_safeplace_path,"/system/system_ext/bin/dpmd"},
 	{feature_safeplace_path,"/system_ext/bin/dpmd"},
 	{feature_safeplace_path,"/vendor/bin/init.qti.dcvs.sh"},
@@ -196,20 +202,30 @@
 	{feature_safeplace_path,"/vendor/bin/hw/android.hardware.thermal@2.0-service.qti-v2"},
 	{feature_safeplace_path,"/vendor/bin/poweropt-service"},
 	{feature_safeplace_path,"/vendor/bin/msm_irqbalance"},
+	{feature_safeplace_path,"/vendor/bin/qms"},
+	{feature_safeplace_path,"/vendor/bin/hw/vendor.qti.MemHal-service"},
+	{feature_safeplace_path,"/vendor/bin/hw/android.hardware.boot-service.qti"},
 	{feature_safeplace_path,"/vendor/bin/cp_diskserver"},
 	{feature_safeplace_path,"/vendor/bin/hw/android.hardware.boot-service.exynos"},
 	{feature_safeplace_path,"/system_ext/bin/mobile_log_d"},
+	{feature_safeplace_path,"/vendor/bin/thermal_manager"},
+	{feature_safeplace_path,"/vendor/bin/nvram_daemon"},
+	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.nvram@1.1-service"},
 	{feature_safeplace_path,"/vendor/bin/aee_aedv"},
 	{feature_safeplace_path,"/vendor/bin/aee_aedv64"},
+	{feature_safeplace_path,"/vendor/bin/meta_tst"},
+	{feature_safeplace_path,"/vendor/bin/thermal_core"},
 	{feature_safeplace_path,"/vendor/bin/dcxosetcap"},
 	{feature_safeplace_path,"/vendor/bin/frs"},
-	{feature_safeplace_path,"/vendor/bin/meta_tst"},
-	{feature_safeplace_path,"/vendor/bin/nvram_daemon"},
-	{feature_safeplace_path,"/vendor/bin/thermal_core"},
-	{feature_safeplace_path,"/vendor/bin/thermal_manager"},
 	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.mtkpower-service.mediatek"},
 	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.nvram-service"},
-	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.nvram@1.1-service"},
+	{feature_safeplace_path,"/system/bin/oem-iptables-init.sh"},
+	{feature_safeplace_path,"/system_ext/bin/aee_aed64_v2"},
+	{feature_safeplace_path,"/system_ext/bin/aee_v2"},
+	{feature_safeplace_path,"/vendor/bin/dmabuf_dump"},
+	{feature_safeplace_path,"/vendor/bin/mrdump_tool"},
+	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.mtkpower@1.0-service"},
+	{feature_safeplace_path,"/vendor/bin/hw/vendor.mediatek.hardware.aee@V1-service"},
 	{feature_safeplace_path,"/system/bin/linkerconfig"},
 	{feature_safeplace_path,"/system/bin/snapshotctl"},
 	{feature_safeplace_path,"/system/bin/boringssl_self_test32"},
@@ -259,6 +275,15 @@
 	{feature_safeplace_path,"/apex/com.android.sdkext/bin/derive_classpath"},
 	{feature_safeplace_path,"/apex/com.android.sdkext@340819010.tmp/bin/derive_classpath"},
 	{feature_safeplace_path,"/system/bin/mtectrl"},
+	{feature_safeplace_path,"/apex/com.android.tethering/bin/netbpfload"},
+	{feature_safeplace_path,"/system/bin/misctrl"},
+	{feature_safeplace_path,"/system/bin/kcmdlinectrl"},
+	{feature_safeplace_path,"/system/bin/appops"},
+	{feature_safeplace_path,"/system/bin/content"},
+	{feature_safeplace_path,"/system/bin/locksettings"},
+	{feature_safeplace_path,"/system/bin/svc"},
+	{feature_safeplace_path,"/system/bin/vintf"},
+	{feature_safeplace_path,"/system/bin/wm"},
 	{feature_safeplace_path,"/system/bin/cplogserver"},
 	{feature_safeplace_path,"/system_ext/bin/modemlog_connmgr_service"},
 	{feature_safeplace_path,"/vendor/bin/hw/vendor.unisoc.hardware.power-service"},
@@ -301,6 +326,7 @@
 	{feature_immutable_src_exception,"/apex/com.android.runtime/bin/crash_dump64"},	/* DEFAULT */
 	{feature_immutable_src_exception,"/data/local/tests/unrestricted/CtsBionicTestCases/arm64/CtsBionicTestCases"},	/* DEFAULT */
 	{feature_immutable_src_exception,"/data/local/tests/unrestricted/CtsBionicTestCases/arm/CtsBionicTestCases"},	/* DEFAULT */
+	{feature_immutable_src_exception,"/data/local/tmp/CtsSimpleperfTestCases"},	/* DEFAULT */
 	{feature_integrity_check,"/vendor/bin/hw/android.hardware.gatekeeper@1.0-service"},
 	{feature_integrity_check,"/vendor/bin/hw/android.hardware.keymaster@4.0-service"},
 	{feature_integrity_check,"/vendor/bin/hw/android.hardware.security.keymint-service"},
@@ -311,4 +337,4 @@
 	{feature_integrity_check,"/vendor/bin/hw/vendor.samsung.hardware.tlc.kg@1.1-service"},
 	/* Rules will be added here */
 	/* Never modify the above line. Rules will be added for buildtime */
-#endif /* if 0 */
+#endif /* __NEVER_DEFINED__ */
