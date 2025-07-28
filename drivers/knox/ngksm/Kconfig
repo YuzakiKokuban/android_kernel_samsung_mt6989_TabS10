@@ -13,14 +13,14 @@
 
 config NGKSM
 	bool "Next Generation Knox Security Monitor feature enable"
-	default n
+	default y
 	help
 	This enables knox securty monitor driver
 
 config NGKPAD
 	bool "Next Generation Knox Peripheral Access Detection feature enable"
 	depends on NGKSM
-	default n
+	default y
 	help
 	This enables Next Generation Knox Peripheral Access Detection
 
