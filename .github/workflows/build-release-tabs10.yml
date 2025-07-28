@@ -1,0 +1,124 @@
+# GitHub Actions Workflow 的名称
+name: Build Kernel & Release (TabS10)
+
+# 工作流的触发条件
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '选择要编译的分支'
+        required: true
+        type: choice
+        options:
+          - main
+          - sukisuultra
+          - mksu
+          - ksu
+        default: 'main'
+      is_prerelease:
+        description: '是否标记为预发布 (Pre-release)?'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+
+    steps:
+      # 第一步：检出你的仓库代码
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          submodules: 'recursive'
+
+      # 第二步：安装所有编译所需的依赖包
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git libncurses5-dev bc bison flex libssl-dev \
+            p7zip-full lz4 cpio curl libelf-dev dwarves ccache
+
+      # 第三步：缓存工具链
+      - name: Cache Toolchain
+        id: toolchain-cache
+        uses: actions/cache@v4
+        with:
+          path: ./toolchain
+          key: ${{ runner.os }}-toolchain-tabs10-${{ hashFiles('**/build-release.yml') }}
+
+      # 第四步：下载、合并并解压 TabS10 工具链
+      - name: Download and Extract Toolchain (TabS10)
+        if: steps.toolchain-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "未找到工具链缓存，开始下载..."
+          wget -O toolchain.part00 "https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases/download/toolchain/toolchainS10.tar.gz.001"
+          wget -O toolchain.part01 "https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases/download/toolchain/toolchainS10.tar.gz.002"
+          
+          echo "合并所有分卷..."
+          cat toolchain.part* > toolchain.tar.gz
+
+          echo "创建并解压到工具链目录..."
+          mkdir -p ./toolchain
+          tar -xzvf toolchain.tar.gz -C ./toolchain/
+          
+          echo "清理下载文件..."
+          rm toolchain.part* toolchain.tar.gz
+          
+          echo "工具链准备完毕。"
+          
+      # 第五步：缓存 ccache 编译结果
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-ccache-${{ github.event.inputs.branch }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      # 第六步：根据分支设置 KernelSU
+      - name: Setup KernelSU based on branch
+        run: |
+          BRANCH_NAME="${{ github.event.inputs.branch }}"
+          echo "当前分支是: $BRANCH_NAME"
+
+          if [[ "$BRANCH_NAME" == "sukisuultra" ]]; then
+            echo "正在为 sukisuultra 分支设置 KernelSU..."
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+          elif [[ "$BRANCH_NAME" == "mksu" ]]; then
+            echo "正在为 mksu 分支设置 KernelSU..."
+            curl -LSs "https://raw.githubusercontent.com/5ec1cff/KernelSU/main/kernel/setup.sh" | bash -
+          elif [[ "$BRANCH_NAME" == "ksu" ]]; then
+            echo "正在为 ksu 分支设置 KernelSU..."
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+          else
+            echo "当前分支 ($BRANCH_NAME) 不需要设置 KernelSU，跳过此步骤。"
+          fi
+          
+          echo "KernelSU 设置步骤完成。"
+
+      # !! 新增步骤：明确显示文件变动 !!
+      - name: Show file changes
+        run: |
+          echo "运行 git status 来追踪文件变化..."
+          git status
+
+      # 第八步：暂存新文件以避免 -dirty 后缀
+      - name: Stage new files to avoid dirty tag
+        run: |
+          git add .
+
+      # 第九步：运行构建和发布脚本
+      - name: Run Build and Release Script
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          IS_PRERELEASE: ${{ github.event.inputs.is_prerelease }}
+          TARGET_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
+

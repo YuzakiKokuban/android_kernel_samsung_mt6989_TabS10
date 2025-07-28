@@ -1,0 +1,6 @@
+/toolchain
+kernel_build_log.txt
+/KernelSU
+/out
+/toolchain/
+/.ccache/

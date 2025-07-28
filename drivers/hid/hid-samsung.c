@@ -458,6 +458,10 @@ static int samsung_universal_kbd_input_mapping(struct hid_device *hdev,
 		case 0x073:
 			samsung_kbd_mouse_map_key_clear(BTN_HOTKEY_APP3);
 			break;
+		/* AI Key */
+		case 0x075:
+			samsung_kbd_mouse_map_key_clear(KEYCODE_AI_HOT);
+			break;
 		/* Dex */
 		case 0x06e:
 			samsung_kbd_mouse_map_key_clear(KEY_DEX_ON);

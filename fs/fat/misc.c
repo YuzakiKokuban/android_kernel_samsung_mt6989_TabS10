@@ -9,7 +9,7 @@
 
 #include "fat.h"
 #include <linux/iversion.h>
-#include <linux/blkdev.h>
+#include <linux/kobject.h>
 
 #ifdef CONFIG_FAT_UEVENT
 static struct kobject fat_uevent_kobj;
