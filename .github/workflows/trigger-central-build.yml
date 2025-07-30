@@ -7,6 +7,8 @@ on:
 jobs:
   trigger:
     runs-on: ubuntu-latest
+    # 新增：如果 commit message 包含 [skip ci]，则不运行此任务
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: Trigger build in kernel-ci repository
         uses: peter-evans/repository-dispatch@v3
