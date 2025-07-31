@@ -4,9 +4,7 @@
 kernel_build_log.txt
 localversion
 build.sh
-
 # KernelSU specific
 /KernelSU/
-
 # Caching
 /.ccache/
