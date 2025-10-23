@@ -20,6 +20,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/erofs.h>
 
+/* @fs.sec -- 8A8F3D7906FE5AD0E5BA3213C47B6C1B -- */
+
 static struct kmem_cache *erofs_inode_cachep __read_mostly;
 
 void _erofs_err(struct super_block *sb, const char *function,
