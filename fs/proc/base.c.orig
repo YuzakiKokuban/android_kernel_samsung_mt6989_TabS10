@@ -98,9 +98,6 @@
 #include <linux/resctrl.h>
 #include <linux/cn_proc.h>
 #include <linux/cpufreq_times.h>
-#ifdef CONFIG_KSU_SUSFS_SUS_MAP
-#include <linux/susfs_def.h>
-#endif
 #include <trace/events/oom.h>
 #include <trace/hooks/sched.h>
 #include "internal.h"
