@@ -1,0 +1,16 @@
+--2025-10-23 18:30:23--  https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh
+正在解析主机 github.com (github.com)... 198.18.0.215
+正在连接 github.com (github.com)|198.18.0.215|:443... 已连接。
+已发出 HTTP 请求，正在等待回应... 302 Found
+位置：https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh [跟随至新的 URL]
+--2025-10-23 18:30:24--  https://raw.githubusercontent.com/vc-teahouse/Baseband-guard/main/setup.sh
+正在解析主机 raw.githubusercontent.com (raw.githubusercontent.com)... 198.18.0.248
+正在连接 raw.githubusercontent.com (raw.githubusercontent.com)|198.18.0.248|:443... 已连接。
+已发出 HTTP 请求，正在等待回应... 200 OK
+长度：5772 (5.6K) [text/plain]
+正在保存至: “STDOUT”
+
+-                     0%[                    ]       0  --.-KB/s               -                   100%[===================>]   5.64K  --.-KB/s  用时 0s      
+
+2025-10-23 18:30:25 (17.3 MB/s) - 已写入至标准输出 [5772/5772]
+
