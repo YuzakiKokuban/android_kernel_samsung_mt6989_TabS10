@@ -27,6 +27,7 @@ obj-$(CONFIG_SECURITY_LANDLOCK)		+= landlock/
 
 # Object integrity file lists
 obj-$(CONFIG_INTEGRITY)			+= integrity/
+obj-$(CONFIG_SECURITY_DSMS)		+= samsung/dsms/
 obj-$(CONFIG_SECURITY_DEFEX)		+= samsung/defex_lsm/
 obj-$(CONFIG_FIVE)			+= samsung/five/
 obj-$(CONFIG_PROCA)			+= samsung/proca/

@@ -40,6 +40,8 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 	struct mmc_gpio *ctx = host->slot.handler_priv;
 #endif
 
+	trace_android_vh_mmc_gpio_cd_irqt(host);
+
 	pr_info("%s: gpio cd irq, status: %s\n",
 			mmc_hostname(host),
 			mmc_gpio_get_cd(host) ? "INSERT" : "REMOVAL");

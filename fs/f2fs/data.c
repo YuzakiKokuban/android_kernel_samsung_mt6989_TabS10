@@ -1512,11 +1512,8 @@ static int __allocate_data_block(struct dnode_of_data *dn, int seg_type)
 	if (err)
 		return err;
 
-	if (GET_SEGNO(sbi, old_blkaddr) != NULL_SEGNO) {
-		invalidate_mapping_pages(META_MAPPING(sbi),
-					old_blkaddr, old_blkaddr);
-		f2fs_invalidate_compress_page(sbi, old_blkaddr);
-	}
+	if (GET_SEGNO(sbi, old_blkaddr) != NULL_SEGNO)
+		f2fs_invalidate_internal_cache(sbi, old_blkaddr, 1);
 
 	f2fs_update_data_blkaddr(dn, dn->data_blkaddr);
 	return 0;
@@ -1970,25 +1967,6 @@ static int f2fs_xattr_fiemap(struct inode *inode,
 	return (err < 0 ? err : 0);
 }
 
-static loff_t max_inode_blocks(struct inode *inode)
-{
-	loff_t result = ADDRS_PER_INODE(inode);
-	loff_t leaf_count = ADDRS_PER_BLOCK(inode);
-
-	/* two direct node blocks */
-	result += (leaf_count * 2);
-
-	/* two indirect node blocks */
-	leaf_count *= NIDS_PER_BLOCK;
-	result += (leaf_count * 2);
-
-	/* one double indirect node block */
-	leaf_count *= NIDS_PER_BLOCK;
-	result += leaf_count;
-
-	return result;
-}
-
 int f2fs_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		u64 start, u64 len)
 {
@@ -2061,8 +2039,7 @@ next:
 	if (!compr_cluster && !(map.m_flags & F2FS_MAP_FLAGS)) {
 		start_blk = next_pgofs;
 
-		if (blks_to_bytes(inode, start_blk) < blks_to_bytes(inode,
-						max_inode_blocks(inode)))
+		if (blks_to_bytes(inode, start_blk) < maxbytes)
 			goto prep_next;
 
 		flags |= FIEMAP_EXTENT_LAST;
@@ -2507,7 +2484,7 @@ static int f2fs_mpage_readpages(struct inode *inode,
 		}
 
 #ifdef CONFIG_F2FS_FS_COMPRESSION
-		if (f2fs_compressed_file(inode)) {
+		if (f2fs_has_compressed_data(inode)) {
 			/* there are remained compressed pages, submit them */
 			if (!f2fs_cluster_can_merge_page(&cc, page->index)) {
 				ret = f2fs_read_multi_pages(&cc, &bio,
@@ -2562,7 +2539,7 @@ next_page:
 			put_page(page);
 
 #ifdef CONFIG_F2FS_FS_COMPRESSION
-		if (f2fs_compressed_file(inode)) {
+		if (f2fs_has_compressed_data(inode)) {
 			/* last page */
 			if (nr_pages == 1 && !f2fs_cluster_is_empty(&cc)) {
 				ret = f2fs_read_multi_pages(&cc, &bio,
@@ -4282,6 +4259,149 @@ static void f2fs_swap_deactivate(struct file *file)
 {
 }
 #endif
+
+static int f2fs_migrate_blocks_for_pinned_file(struct inode *inode, block_t start_blk,
+							unsigned int blkcnt)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	unsigned int blk_per_sec = BLKS_PER_SEC(sbi);
+	unsigned int secidx;
+	unsigned int migrate_sec = (blkcnt + blk_per_sec - 1) / blk_per_sec;
+	unsigned int blkidx = start_blk;
+	unsigned int last_secno;
+	int ret = 0;
+
+	filemap_invalidate_lock(inode->i_mapping);
+
+	set_inode_flag(inode, FI_ALIGNED_WRITE);
+	set_inode_flag(inode, FI_OPU_WRITE);
+
+	last_secno = GET_SECNO(sbi, sbi->pin_guaranteed_blkaddr - 1);
+	for (secidx = 0; secidx < migrate_sec; secidx++) {
+		unsigned int secno, blkofs;
+
+		f2fs_down_write(&sbi->pin_sem);
+
+		spin_lock(&FREE_I(sbi)->segmap_lock);
+		secno = find_next_zero_bit(FREE_I(sbi)->free_secmap,
+				MAIN_SECS(sbi), 0);
+		if (secno > last_secno) {
+			spin_unlock(&FREE_I(sbi)->segmap_lock);
+			ret = f2fs_gc_for_pinned_type(sbi);
+			if (ret) {
+				f2fs_up_write(&sbi->pin_sem);
+				goto done;
+			}
+		} else {
+			sbi->pin_reserved_sec = secno;
+			spin_unlock(&FREE_I(sbi)->segmap_lock);
+		}
+
+		f2fs_lock_op(sbi);
+		f2fs_allocate_new_section(sbi, CURSEG_COLD_DATA_PINNED, false);
+		f2fs_unlock_op(sbi);
+
+		set_inode_flag(inode, FI_SKIP_WRITES);
+
+		for (blkofs = 0; blkofs < blk_per_sec && blkidx < start_blk + blkcnt; blkofs++, blkidx++) {
+			struct page *page;
+
+			page = f2fs_get_lock_data_page(inode, blkidx, true);
+			if (IS_ERR(page)) {
+				if (PTR_ERR(page) == -ENOENT)
+					continue;
+				f2fs_up_write(&sbi->pin_sem);
+				ret = PTR_ERR(page);
+				goto done;
+			}
+
+			set_page_dirty(page);
+			f2fs_put_page(page, 1);
+		}
+
+		clear_inode_flag(inode, FI_SKIP_WRITES);
+
+		ret = filemap_fdatawrite(inode->i_mapping);
+		f2fs_up_write(&sbi->pin_sem);
+		if (ret)
+			break;
+	}
+done:
+	clear_inode_flag(inode, FI_SKIP_WRITES);
+	clear_inode_flag(inode, FI_OPU_WRITE);
+	clear_inode_flag(inode, FI_ALIGNED_WRITE);
+
+	filemap_invalidate_unlock(inode->i_mapping);
+
+	return ret;
+}
+
+int f2fs_migrate_pinned_file(struct inode *inode)
+{
+	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
+	sector_t cur_lblock, last_lblock;
+	pgoff_t next_pgofs;
+	unsigned int blks_per_sec = BLKS_PER_SEC(sbi);
+	const unsigned int blocksize = blks_to_bytes(inode, 1);
+	int ret = 0;
+
+	cur_lblock = 0;
+	last_lblock = bytes_to_blks(inode, i_size_read(inode) + blocksize - 1);
+
+	while (cur_lblock < last_lblock) {
+		struct f2fs_map_blocks map;
+		sector_t pblock;
+		unsigned long nr_pblocks;
+
+		memset(&map, 0, sizeof(map));
+		map.m_lblk = cur_lblock;
+		map.m_len = last_lblock - cur_lblock;
+		map.m_next_pgofs = &next_pgofs;
+		map.m_next_extent = NULL;
+		map.m_seg_type = NO_CHECK_TYPE;
+		map.m_may_create = false;
+
+		ret = f2fs_map_blocks(inode, &map, F2FS_GET_BLOCK_FIEMAP);
+		if (ret)
+			return ret;
+
+		if (!(map.m_flags & F2FS_MAP_FLAGS)) {
+			cur_lblock = next_pgofs;
+			if (blks_to_bytes(inode, cur_lblock) <
+			    blks_to_bytes(inode, max_file_blocks(inode)))
+				goto next;
+			return ret;
+		}
+
+		pblock = map.m_pblk;
+		nr_pblocks = map.m_len;
+		if (nr_pblocks == 0) {
+			f2fs_err(sbi, "[DDP] pblock:%llu, nr_pblocks:%lu, cur_lblock:%llu, last_lblock:%llu",
+				pblock, nr_pblocks, cur_lblock, last_lblock);
+			f2fs_bug_on(sbi, 1);
+		}
+
+		if (pblock + nr_pblocks >= sbi->pin_guaranteed_blkaddr) {
+			if (pblock < sbi->pin_guaranteed_blkaddr) {
+				nr_pblocks -= sbi->pin_guaranteed_blkaddr - pblock;
+				cur_lblock += sbi->pin_guaranteed_blkaddr - pblock;
+			}
+			nr_pblocks = roundup(nr_pblocks, blks_per_sec);
+			if (cur_lblock + nr_pblocks > last_lblock)
+				nr_pblocks = last_lblock - cur_lblock;
+			ret = f2fs_migrate_blocks_for_pinned_file(inode, cur_lblock,
+							nr_pblocks);
+			if (ret)
+				return ret;
+		}
+		cur_lblock += nr_pblocks;
+next:
+		cond_resched();
+		if (fatal_signal_pending(current))
+			return -EINTR;
+	}
+	return ret;
+}
 
 const struct address_space_operations f2fs_dblock_aops = {
 	.read_folio	= f2fs_read_data_folio,

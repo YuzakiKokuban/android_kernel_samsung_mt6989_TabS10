@@ -116,14 +116,23 @@ struct cred_param {
 	};
 };
 
+struct cred_kdp_init {
+    union {
+        atomic_t use_cnt;
+        // padding for alignment of ro_rcu_head_init address
+        u64 padding;
+    };
+	struct ro_rcu_head ro_rcu_head_init;
+};
+
 #define PROTECT_INIT 1
 #define PROTECT_KMEM 2
 
 #define GET_ROCRED_RCU(cred) \
 ( \
 	((u64)cred == (u64)&init_cred)? \
-		(struct ro_rcu_head *)((atomic_t *)init_cred_kdp.use_cnt + 1): \
-		(struct ro_rcu_head *)((atomic_t *)((struct cred_kdp *)cred)->use_cnt + 1) \
+		&(((struct cred_kdp_init *)init_cred_kdp.use_cnt)->ro_rcu_head_init): \
+		&(((struct cred_kdp_init *)((struct cred_kdp *)cred)->use_cnt)->ro_rcu_head_init) \
 )
 
 extern struct cred init_cred;

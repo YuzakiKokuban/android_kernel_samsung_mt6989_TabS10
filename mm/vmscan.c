@@ -605,7 +605,14 @@ unsigned long zone_reclaimable_pages(struct zone *zone)
 	if (can_reclaim_anon_pages(NULL, zone_to_nid(zone), NULL))
 		nr += zone_page_state_snapshot(zone, NR_ZONE_INACTIVE_ANON) +
 			zone_page_state_snapshot(zone, NR_ZONE_ACTIVE_ANON);
-
+	/*
+	 * If there are no reclaimable file-backed or anonymous pages,
+	 * ensure zones with sufficient free pages are not skipped.
+	 * This prevents zones like DMA32 from being ignored in reclaim
+	 * scenarios where they can still help alleviate memory pressure.
+	 */
+	if (nr == 0)
+		nr = zone_page_state_snapshot(zone, NR_FREE_PAGES);
 	return nr;
 }
 
@@ -809,6 +816,7 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 
 	freeable = shrinker->count_objects(shrinker, shrinkctl);
 	trace_android_vh_do_shrink_slab(shrinker, &freeable);
+	trace_android_vh_do_shrink_slab_ex(shrinkctl, shrinker, &freeable, priority);
 	if (freeable == 0 || freeable == SHRINK_EMPTY)
 		return freeable;
 
@@ -2716,6 +2724,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
 		}
 
 		trace_android_vh_page_referenced_check_bypass(folio, nr_to_scan, lru, &bypass);
+		trace_android_vh_folio_referenced_check_bypass(folio, sc->priority,
+					     nr_to_scan, lru, &bypass);
 		if (bypass)
 			goto skip_folio_referenced;
 		trace_android_vh_folio_trylock_set(folio);
@@ -2828,12 +2838,12 @@ unsigned long __reclaim_pages(struct list_head *folio_list, void *private)
 
 	return nr_reclaimed;
 }
-EXPORT_SYMBOL_GPL(reclaim_pages);
 
 unsigned long reclaim_pages(struct list_head *folio_list)
 {
 	return __reclaim_pages(folio_list, NULL);
 }
+EXPORT_SYMBOL_GPL(reclaim_pages);
 
 static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
 				 struct lruvec *lruvec, struct scan_control *sc)
@@ -3025,29 +3035,10 @@ enum mem_boost {
 static int mem_boost_mode = NO_BOOST;
 static unsigned long last_mode_change;
 static bool am_app_launch = false;
+static unsigned long low_threshold;
 
 #define MEM_BOOST_MAX_TIME (5 * HZ) /* 5 sec */
 #ifdef CONFIG_SYSFS
-#define MB_TO_PAGES(x) ((x) << (20 - PAGE_SHIFT))
-#define GB_TO_PAGES(x) ((x) << (30 - PAGE_SHIFT))
-static unsigned long low_threshold;
-static inline bool is_too_low_file(void)
-{
-	unsigned long pgdatfile;
-	if (!low_threshold) {
-		if (totalram_pages() > GB_TO_PAGES(4))
-			low_threshold = MB_TO_PAGES(500);
-		else if (totalram_pages() > GB_TO_PAGES(3))
-			low_threshold = MB_TO_PAGES(400);
-		else if (totalram_pages() > GB_TO_PAGES(2))
-			low_threshold = MB_TO_PAGES(300);
-		else
-			low_threshold = MB_TO_PAGES(200);
-	}
-	pgdatfile = global_node_page_state(NR_ACTIVE_FILE) +
-		    global_node_page_state(NR_INACTIVE_FILE);
-	return pgdatfile < low_threshold;
-}
 inline bool need_memory_boosting(void)
 {
 	if (time_after(jiffies, last_mode_change + MEM_BOOST_MAX_TIME))
@@ -3229,7 +3220,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
 	trace_android_rvh_set_balance_anon_file_reclaim(&balance_anon_file_reclaim);
 
 	if (current_is_kswapd() && need_memory_boosting() &&
-	    !is_too_low_file()) {
+	    !file_is_tiny(low_threshold)) {
 		scan_balance = SCAN_FILE;
 		goto out;
 	}
@@ -6774,6 +6765,7 @@ static void shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 	struct lruvec *target_lruvec;
 	bool reclaimable = false;
 
+	trace_android_vh_shrink_node(pgdat, sc->target_mem_cgroup);
 	if (lru_gen_enabled() && global_reclaim(sc)) {
 		lru_gen_shrink_node(pgdat, sc);
 		return;
@@ -7324,7 +7316,7 @@ unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
 		.may_writepage = !laptop_mode,
 		.may_unmap = 1,
 #ifdef CONFIG_DIRECT_RECLAIM_FILE_PAGES_ONLY
-		.may_swap = 0,
+		.may_swap = file_is_tiny(low_threshold) ? 1 : 0,
 #else
 		.may_swap = 1,
 #endif
@@ -8074,8 +8066,12 @@ kswapd_try_sleep:
 		 */
 		trace_mm_vmscan_kswapd_wake(pgdat->node_id, highest_zoneidx,
 						alloc_order);
+		trace_android_rvh_vmscan_kswapd_wake(pgdat->node_id, highest_zoneidx,
+						alloc_order);
 		reclaim_order = balance_pgdat(pgdat, alloc_order,
 						highest_zoneidx);
+		trace_android_rvh_vmscan_kswapd_done(pgdat->node_id, highest_zoneidx,
+						alloc_order, reclaim_order);
 		trace_android_vh_vmscan_kswapd_done(pgdat->node_id, highest_zoneidx,
 			       			alloc_order, reclaim_order);
 		if (reclaim_order < alloc_order)
@@ -8235,6 +8231,7 @@ static int __init kswapd_init(void)
 {
 	int nid;
 
+	low_threshold = get_low_threshold();
 #if CONFIG_KSWAPD_CPU
 	init_kswapd_cpumask();
 #endif
