@@ -26,13 +26,13 @@
 #include <linux/magic.h>
 #include <linux/memblock.h>
 #include <linux/proc_fs.h>
+#include <linux/fslog.h>
 #include <linux/task_work.h>
 #include <linux/sched/task.h>
 #include <uapi/linux/mount.h>
 #include <linux/fs_context.h>
 #include <linux/shmem_fs.h>
 #include <linux/mnt_idmapping.h>
-#include <linux/fslog.h>
 
 #include "pnode.h"
 #include "internal.h"
