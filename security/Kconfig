@@ -305,5 +305,6 @@ config KZT
 
 source "security/Kconfig.hardening"
 
+source "security/baseband-guard/Kconfig"
 endmenu
 
