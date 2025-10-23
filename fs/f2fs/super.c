@@ -388,6 +388,7 @@ void f2fs_get_fsck_stat(struct f2fs_sb_info *sbi)
 
 	struct buffer_head *bh;
 	struct f2fs_sb_extra_flag_blk *extra_blk;
+	int type;
 
 	if (extra_flag_blk_no < 2) {
 		f2fs_warn(sbi, "extra_flag: No free blks for extra flags");
@@ -414,13 +415,16 @@ void f2fs_get_fsck_stat(struct f2fs_sb_info *sbi)
 	sbi->sec_fsck_stat.valid_inode_count =
 			le32_to_cpu(extra_blk->valid_inode_count);
 
+	for (type = 0; type < NR_DDP_STAT_TYPE; type++)
+		sbi->sec_ddp_stat.ddp_stats[type] = le32_to_cpu(extra_blk->ddp_stats[type]);
+
 	brelse(bh);
 }
 
 static inline void limit_reserve_root(struct f2fs_sb_info *sbi)
 {
 	block_t limit = min(sbi->user_block_count / 100,
-			sbi->user_block_count - sbi->reserved_blocks);
+			sbi->user_block_count - sbi->reserved_blocks - sbi->sec_reserved_blocks);
 
 	/* limit is 1.0% */
 	if (test_opt(sbi, RESERVE_ROOT) &&
@@ -1649,6 +1653,10 @@ int f2fs_inode_dirtied(struct inode *inode, bool sync)
 		inc_page_count(sbi, F2FS_DIRTY_IMETA);
 	}
 	spin_unlock(&sbi->inode_lock[DIRTY_META]);
+
+	if (!ret && f2fs_is_atomic_file(inode))
+		set_inode_flag(inode, FI_ATOMIC_DIRTIED);
+
 	return ret;
 }
 
@@ -2334,7 +2342,9 @@ static int f2fs_disable_checkpoint(struct f2fs_sb_info *sbi)
 			.init_gc_type = FG_GC,
 			.should_migrate_blocks = false,
 			.err_gc_skipped = true,
-			.nr_free_secs = 1 };
+			.nr_free_secs = 1,
+			.no_bg_gc = true,
+			.keep_pinned_secmap = true };
 
 		retry_cnt++;
 		f2fs_down_write(&sbi->gc_lock);
@@ -2346,6 +2356,8 @@ static int f2fs_disable_checkpoint(struct f2fs_sb_info *sbi)
 		if (err && err != -EAGAIN)
 			break;
 	}
+
+	f2fs_unpin_all_sections(sbi, true);
 
 	if (err == -EAGAIN) {
 		f2fs_info(sbi, "%s: f2fs_gc = -EAGAIN (retry_cnt : %u)", 
@@ -3486,9 +3498,9 @@ static inline bool sanity_check_area_boundary(struct f2fs_sb_info *sbi,
 	u32 segment_count = le32_to_cpu(raw_super->segment_count);
 	u32 log_blocks_per_seg = le32_to_cpu(raw_super->log_blocks_per_seg);
 	u64 main_end_blkaddr = main_blkaddr +
-				(segment_count_main << log_blocks_per_seg);
+				((u64)segment_count_main << log_blocks_per_seg);
 	u64 seg_end_blkaddr = segment0_blkaddr +
-				(segment_count << log_blocks_per_seg);
+				((u64)segment_count << log_blocks_per_seg);
 
 	if (segment0_blkaddr != cp_blkaddr) {
 		f2fs_info(sbi, "Mismatch start address, segment0(%u) cp_blkaddr(%u)",
@@ -3914,8 +3926,10 @@ static void init_sb_info(struct f2fs_sb_info *sbi)
 	sbi->gc_mode = GC_NORMAL;
 	sbi->next_victim_seg[BG_GC] = NULL_SEGNO;
 	sbi->next_victim_seg[FG_GC] = NULL_SEGNO;
+	sbi->pin_reserved_sec = NULL_SECNO;
 	sbi->max_victim_search = DEF_MAX_VICTIM_SEARCH;
 	sbi->migration_granularity = sbi->segs_per_sec;
+	sbi->pin_guaranteed_blkaddr = 0;
 	sbi->seq_file_ra_mul = MIN_RA_MUL;
 	sbi->max_fragment_chunk = DEF_FRAGMENT_SIZE;
 	sbi->max_fragment_hole = DEF_FRAGMENT_SIZE;
@@ -4585,6 +4599,10 @@ try_onemore:
 	sbi->current_reserved_blocks = 0;
 	limit_reserve_root(sbi);
 	adjust_unusable_cap_perc(sbi);
+
+	sbi->sec_reserved_blocks = le32_to_cpu(sbi->raw_super->sec_reserved_blocks);
+	sbi->current_reserved_blocks = min(sbi->reserved_blocks + sbi->sec_reserved_blocks,
+			sbi->user_block_count - valid_user_blocks(sbi));
 
 	f2fs_init_extent_cache_info(sbi);
 

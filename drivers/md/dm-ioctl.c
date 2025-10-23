@@ -1121,6 +1121,23 @@ out:
 	return r;
 }
 
+static bool dm_has_same_request_queue(struct dm_table *t)
+{
+	struct list_head *devices;
+	struct dm_dev_internal *dd;
+	struct request_queue *rq = NULL;
+
+	devices = dm_table_get_devices(t);
+	list_for_each_entry(dd, devices, list) {
+		if (!rq)
+			rq = bdev_get_queue(dd->dm_dev->bdev);
+		else if (rq != bdev_get_queue(dd->dm_dev->bdev))
+			return false;
+	}
+
+	return true;
+}
+
 static int do_resume(struct dm_ioctl *param)
 {
 	int r = 0;
@@ -1193,6 +1210,11 @@ static int do_resume(struct dm_ioctl *param)
 			set_disk_ro(dm_disk(md), 0);
 		else
 			set_disk_ro(dm_disk(md), 1);
+
+		if (dm_has_same_request_queue(new_map))
+			set_bit(DMF_SEC_FLUSH_ONCE_SAME_RQ, &md->flags);
+		else
+			clear_bit(DMF_SEC_FLUSH_ONCE_SAME_RQ, &md->flags);
 	}
 
 	if (dm_suspended_md(md)) {
