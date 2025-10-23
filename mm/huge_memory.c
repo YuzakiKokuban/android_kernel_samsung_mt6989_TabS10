@@ -1372,6 +1372,7 @@ vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
 		pmd_t entry;
 
 		page_move_anon_rmap(page, vma);
+		SetPageAnonExclusive(page);
 		folio_unlock(folio);
 reuse:
 		if (unlikely(unshare)) {
@@ -2073,6 +2074,7 @@ spinlock_t *__pmd_trans_huge_lock(pmd_t *pmd, struct vm_area_struct *vma)
 	spin_unlock(ptl);
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(__pmd_trans_huge_lock);
 
 /*
  * Returns page table lock pointer if a given pud maps a thp, NULL otherwise.
@@ -2872,7 +2874,7 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 	 * split PMDs
 	 */
 	if (!can_split_folio(folio, &extra_pins)) {
-		ret = -EBUSY;
+		ret = -EAGAIN;
 		goto out_unlock;
 	}
 
@@ -2924,7 +2926,7 @@ fail:
 			xas_unlock(&xas);
 		local_irq_enable();
 		remap_page(folio, folio_nr_pages(folio));
-		ret = -EBUSY;
+		ret = -EAGAIN;
 	}
 
 out_unlock:
