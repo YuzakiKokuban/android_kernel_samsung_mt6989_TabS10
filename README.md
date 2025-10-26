@@ -1,3 +1,4 @@
+
 # Kokuban 内核 for 三星 Galaxy Tab S10 系列
 
 <p align="center">
@@ -194,4 +195,3 @@ Pleaseee~ Thank you so much!
 <p align="center">
 <a href="https://www.paypal.me/LangQin280">☕ Support Me</a>
 </p>
->>>>>>> origin/sukisuultra
