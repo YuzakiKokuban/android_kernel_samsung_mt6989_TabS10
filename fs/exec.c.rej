@@ -1,0 +1,10 @@
+@@ -64,6 +64,9 @@
+ #include <linux/io_uring.h>
+ #include <linux/syscall_user_dispatch.h>
+ #include <linux/coredump.h>
++#ifdef CONFIG_KSU_SUSFS
++#include <linux/susfs_def.h>
++#endif
+ 
+ #include <linux/uaccess.h>
+ #include <asm/mmu_context.h>
