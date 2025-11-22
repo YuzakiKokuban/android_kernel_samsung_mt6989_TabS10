@@ -7,7 +7,7 @@
 
 <p align="center">
 <a href="https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases"><img src="https://img.shields.io/github/v/release/YuzakiKokuban/android_kernel_samsung_sm8750?style=for-the-badge&logo=github&color=blue" alt="GitHub release"></a>
-<a href="https://t.me/YuzakiKokuban"><img src="https://img.shields.io/badge/Telegram-交流群-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+<a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-交流群-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
 这是一个基于三星官方内核源码构建的，适用于 **三星 Galaxy Tab S10 系列** 的高性能自定义内核。它旨在提供卓越的稳定性和流畅度，同时集成了最新的 KernelSU 功能，为您带来最佳的玩机体验。
@@ -104,7 +104,7 @@ KernelSU-Next 不是 KernelSU 官方开发的，也不是官方认可的改进�
 
 <p align="center">
 <a href="https://github.com/YuzakiKokuban/android_kernel_samsung_mt6989_TabS10/releases"><img src="https://img.shields.io/github/v/release/YuzakiKokuban/android_kernel_samsung_sm8750?style=for-the-badge&logo=github&color=blue" alt="GitHub release"></a>
-<a href="https://t.me/YuzakiKokuban"><img src="https://img.shields.io/badge/Telegram-Chat-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+<a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-Chat-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
 This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series**, built upon Samsung's official kernel source. It is designed to deliver exceptional stability and smoothness while integrating the latest KernelSU features for the ultimate user experience.
