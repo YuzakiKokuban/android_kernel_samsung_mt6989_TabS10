@@ -1,5 +1,5 @@
-
-# Kokuban 内核 for 三星 Galaxy Tab S10 系列
+<!-- BEGIN-ZH -->
+# Kokuban 内核 for 未知设备
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/YuzakiKokuban/Kokuban_Kernel_CI_Center/main/docs/kokuban_logo.png" alt="Logo" width="150">
@@ -10,7 +10,7 @@
 <a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-交流群-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
-这是一个基于三星官方内核源码构建的，适用于 **三星 Galaxy Tab S10 系列** 的高性能自定义内核。它旨在提供卓越的稳定性和流畅度，同时集成了最新的 KernelSU 功能，为您带来最佳的玩机体验。
+这是一个基于三星官方内核源码构建的，适用于 **未知设备** 的高性能自定义内核。它旨在提供卓越的稳定性和流畅度，同时集成了最新的 KernelSU 功能，为您带来最佳的玩机体验。
 
 ## 📌 主要特性
 
@@ -18,7 +18,7 @@
 
 * **性能优化**: 针对性的性能调度优化，带来更流畅的日常使用和游戏体验。
 
-* **KernelSU 集成**: 内置多种 KernelSU 版本（包括官方版、MKSU、SukiSU-Ultra），开箱即用。
+* **KernelSU 集成**: 内置多种 KernelSU 版本（包括官方版、MKSU、ReSukiSU），开箱即用。
 
 * **版本信息**: `-android14-Kokuban-Exusiai-CYI6`
 
@@ -40,9 +40,9 @@
 
   * 内置由 `5ec1cff` 修改的 KernelSU，特性是支持 Magic Mount，可以更方便地挂载模块。
 
-* **SukiSUU (SukiSU-Ultra)**
+* **ReSuki (ReSukiSU)**
 
-  * 内置功能强大的 SukiSU-Ultra，支持 SUSFS 和 KPM 模块，为高级玩家提供更多可玩性。
+  * 内置功能强大的 ReSukiSU，支持 SUSFS 和 KPM 模块，为高级玩家提供更多可玩性。
 
 ## ⚙️ 安装指南
 
@@ -82,7 +82,7 @@ KernelSU-Next 不是 KernelSU 官方开发的，也不是官方认可的改进�
 
 [岁月史书](https://web.archive.org/web/20250211155215/https://github.com/rifsxd/KernelSU-Next/issues/145)
 
-如果你想要类似功能的话，拜托用 **SukiSU** 好不好嘛～
+如果你想要类似功能的话，拜托用 **ReSukiSU** 好不好嘛～
 它更稳定，也更值得信赖！
 
 ---
@@ -93,10 +93,10 @@ KernelSU-Next 不是 KernelSU 官方开发的，也不是官方认可的改进�
 拜托啦～谢谢谢谢！
 
 ---
+<!-- END-ZH -->
 
-
-
-# Kokuban Kernel for Samsung Galaxy Tab S10 Series
+<!-- BEGIN-EN -->
+# Kokuban Kernel for Unknown Device
 
 <p align="center">
 <img src="https://raw.githubusercontent.com/YuzakiKokuban/Kokuban_Kernel_CI_Center/main/docs/kokuban_logo.png" alt="Logo" width="150">
@@ -107,7 +107,7 @@ KernelSU-Next 不是 KernelSU 官方开发的，也不是官方认可的改进�
 <a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-Chat-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
-This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series**, built upon Samsung's official kernel source. It is designed to deliver exceptional stability and smoothness while integrating the latest KernelSU features for the ultimate user experience.
+This is a high-performance custom kernel for the **Unknown Device**, built upon Samsung's official kernel source. It is designed to deliver exceptional stability and smoothness while integrating the latest KernelSU features for the ultimate user experience.
 
 ## 📌 Highlights
 
@@ -115,7 +115,7 @@ This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series
 
 * **Performance-Tuned**: Targeted performance and scheduling optimizations for a smoother daily usage and gaming experience.
 
-* **KernelSU Integrated**: Comes with multiple KernelSU variants (Official, MKSU, SukiSU-Ultra) built-in for an out-of-the-box experience.
+* **KernelSU Integrated**: Comes with multiple KernelSU variants (Official, MKSU, ReSukiSU) built-in for an out-of-the-box experience.
 
 * **Version Info**: `-android14-Kokuban-Exusiai-CYI6`
 
@@ -137,9 +137,9 @@ This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series
 
   * Features KernelSU modified by `5ec1cff`, which notably supports Magic Mount for easier module management.
 
-* **SukiSUU (SukiSU-Ultra)**
+* **ReSuki (ReSukiSU)**
 
-  * Integrated with the powerful SukiSU-Ultra, supporting SUSFS and KPM modules, offering advanced features for power users.
+  * Integrated with the powerful ReSukiSU, supporting SUSFS and KPM modules, offering advanced features for power users.
 
 ## ⚙️ Installation Guide
 
@@ -179,7 +179,7 @@ Also, its developer has done some really confusing and questionable things...
 
 [Some Records](https://web.archive.org/web/20250211155215/https://github.com/rifsxd/KernelSU-Next/issues/145)
 
-If you need similar functionality, please use **SukiSU**, okay?
+If you need similar functionality, please use **ReSukiSU**, okay?
 It's much more stable and trustworthy!
 
 ---
@@ -190,7 +190,7 @@ I might actually burst into tears!!!
 Pleaseee~ Thank you so much!
 
 ---
-
+<!-- END-EN -->
 
 <p align="center">
 <a href="https://www.paypal.me/LangQin280">☕ Support Me</a>
