@@ -10,11 +10,10 @@
 <a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-交流群-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
-这是一个基于三星官方内核源码构建的，适用于 **三星 Galaxy Tab S10 系列** 的高性能自定义内核。它旨在提供卓越的稳定性和流畅度，同时集成了最新的 KernelSU 功能，为您带来最佳的玩机体验。
+这是一个适用于 **三星 Galaxy Tab S10 系列** 的高性能自定义内核。它旨在提供卓越的稳定性和流畅度，同时集成了最新的 KernelSU 功能，为您带来最佳的玩机体验。
 
 ## 📌 主要特性
 
-* **官方源码基础**: 基于三星官方最新的内核源码，确保最佳的兼容性和稳定性。
 
 * **性能优化**: 针对性的性能调度优化，带来更流畅的日常使用和游戏体验。
 
@@ -27,8 +26,6 @@
 * **LKM (Loadable Kernel Module)**
 
   * 未内置任何 Root 方案，保持官方内核的纯净性。
-
-  * **安全性**: 仅移除了部分影响玩机的三星安全策略，如 RKP, KDP 等。
 
   * **使用方式**: 需要您通过 KernelSU Manager App 手动修补设备的 `init_boot` 分区来实现 Root。
 
@@ -107,11 +104,9 @@ KernelSU-Next 不是 KernelSU 官方开发的，也不是官方认可的改进�
 <a href="https://t.me/kokubanchat"><img src="https://img.shields.io/badge/Telegram-Chat-blue.svg?style=for-the-badge&logo=telegram" alt="Telegram"></a>
 </p>
 
-This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series**, built upon Samsung's official kernel source. It is designed to deliver exceptional stability and smoothness while integrating the latest KernelSU features for the ultimate user experience.
+This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series**. It is designed to deliver exceptional stability and smoothness while integrating the latest KernelSU features for the ultimate user experience.
 
 ## 📌 Highlights
-
-* **Official Source Base**: Built on the latest official kernel source from Samsung, ensuring optimal compatibility and stability.
 
 * **Performance-Tuned**: Targeted performance and scheduling optimizations for a smoother daily usage and gaming experience.
 
@@ -124,8 +119,6 @@ This is a high-performance custom kernel for the **Samsung Galaxy Tab S10 Series
 * **LKM (Loadable Kernel Module)**
 
   * Does not include any built-in root solution, maintaining the purity of the stock kernel.
-
-  * **Security**: Only essential Samsung security policies that affect modding (like RKP, KDP) are removed.
 
   * **Usage**: Requires you to manually patch your device's `init_boot` partition using the KernelSU Manager App to achieve root.
 
