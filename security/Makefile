@@ -35,5 +35,3 @@ obj-$(CONFIG_GAF)			+= samsung/proca/gaf/
 
 # KNOX ZT
 obj-$(CONFIG_KZT) += kzt/
-
-obj-$(CONFIG_BBG) += baseband-guard/

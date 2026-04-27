@@ -33,6 +33,7 @@
 #include <linux/hid-debug.h>
 #include <linux/hidraw.h>
 #include <linux/uhid.h>
+#include <linux/usb/composite.h>
 
 #include "hid-ids.h"
 
@@ -295,6 +296,9 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 
 	if (IS_BUILTIN(CONFIG_UHID) && parser->device->ll_driver == &uhid_hid_driver)
 		max_buffer_size = UHID_DATA_MAX;
+
+	if (parser->device->ll_driver == &acc_hid_ll_driver)
+		max_buffer_size = USB_COMP_EP0_BUFSIZ;
 
 	/* Total size check: Allow for possible report index byte */
 	if (report->size > (max_buffer_size - 1) << 3) {
@@ -1991,6 +1995,9 @@ int hid_report_raw_event(struct hid_device *hid, enum hid_report_type type, u8 *
 	if (IS_BUILTIN(CONFIG_UHID) && hid->ll_driver == &uhid_hid_driver)
 		max_buffer_size = UHID_DATA_MAX;
 
+	if (hid->ll_driver == &acc_hid_ll_driver)
+		max_buffer_size = USB_COMP_EP0_BUFSIZ;
+
 	if (report_enum->numbered && rsize >= max_buffer_size)
 		rsize = max_buffer_size - 1;
 	else if (rsize > max_buffer_size)
@@ -2402,6 +2409,9 @@ int hid_hw_raw_request(struct hid_device *hdev,
 	if (IS_BUILTIN(CONFIG_UHID) && hdev->ll_driver == &uhid_hid_driver)
 		max_buffer_size = UHID_DATA_MAX;
 
+	if (hdev->ll_driver == &acc_hid_ll_driver)
+		max_buffer_size = USB_COMP_EP0_BUFSIZ;
+
 	if (len < 1 || len > max_buffer_size || !buf)
 		return -EINVAL;
 
@@ -2425,6 +2435,9 @@ int hid_hw_output_report(struct hid_device *hdev, __u8 *buf, size_t len)
 
 	if (IS_BUILTIN(CONFIG_UHID) && hdev->ll_driver == &uhid_hid_driver)
 		max_buffer_size = UHID_DATA_MAX;
+
+	if (hdev->ll_driver == &acc_hid_ll_driver)
+		max_buffer_size = USB_COMP_EP0_BUFSIZ;
 
 	if (len < 1 || len > max_buffer_size || !buf)
 		return -EINVAL;
