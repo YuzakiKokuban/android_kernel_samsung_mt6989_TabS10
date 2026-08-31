@@ -64,6 +64,11 @@
 #include <linux/io_uring.h>
 #include <linux/syscall_user_dispatch.h>
 #include <linux/coredump.h>
+
+#ifndef __GENKSYMS__
+#include <linux/dma-buf.h>
+
+#endif
 #include <linux/task_integrity.h>
 
 #include <linux/uaccess.h>
