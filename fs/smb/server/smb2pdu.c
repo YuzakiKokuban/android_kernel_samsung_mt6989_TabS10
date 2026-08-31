@@ -12,6 +12,7 @@
 #include <linux/ethtool.h>
 #include <linux/falloc.h>
 #include <linux/mount.h>
+#include <linux/string.h>
 
 #include "glob.h"
 #include "smbfsctl.h"
@@ -37,6 +38,51 @@
 #include "mgmt/user_session.h"
 #include "mgmt/ksmbd_ida.h"
 #include "ndr.h"
+
+/**
+ * Function to get filename or folder name
+ * from absolute path
+ */
+const char *get_extract(const char *name)
+{
+	const char *last_slash = NULL;
+
+	last_slash = strrchr(name, '/');
+
+	if (last_slash != NULL)
+		return last_slash+1;
+
+	return name;
+}
+
+/**
+ * Function for returning last three characters of string name
+ * return string with last three characters
+ */
+const char *get_last_three_chars(const char *name)
+{
+	int len = strlen(name);
+
+	if (len <= 3)
+		return &name[len];
+
+	return &name[len-3];
+}
+
+/**
+ * Function for returning the filename from File object
+ */
+const char *get_filename(struct file *filp)
+{
+	struct dentry *dentry;
+	const char *filename = NULL;
+
+	if (!filp || !filp->f_path.dentry)
+		return NULL;
+	dentry = filp->f_path.dentry;
+	filename = (const char *)dentry->d_name.name;
+	return filename;
+}
 
 static void __wbuf(struct ksmbd_work *work, void **req, void **rsp)
 {
@@ -1356,8 +1402,7 @@ static int ntlm_negotiate(struct ksmbd_work *work,
 		return rc;
 
 	sz = le16_to_cpu(rsp->SecurityBufferOffset);
-	chgblob =
-		(struct challenge_message *)((char *)&rsp->hdr.ProtocolId + sz);
+	chgblob = (struct challenge_message *)rsp->Buffer;
 	memset(chgblob, 0, sizeof(struct challenge_message));
 
 	if (!work->conn->use_spnego) {
@@ -1390,8 +1435,7 @@ static int ntlm_negotiate(struct ksmbd_work *work,
 		goto out;
 	}
 
-	sz = le16_to_cpu(rsp->SecurityBufferOffset);
-	memcpy((char *)&rsp->hdr.ProtocolId + sz, spnego_blob, spnego_blob_len);
+	memcpy(rsp->Buffer, spnego_blob, spnego_blob_len);
 	rsp->SecurityBufferLength = cpu_to_le16(spnego_blob_len);
 
 out:
@@ -1473,8 +1517,7 @@ static int ntlm_authenticate(struct ksmbd_work *work,
 		if (rc)
 			return -ENOMEM;
 
-		sz = le16_to_cpu(rsp->SecurityBufferOffset);
-		memcpy((char *)&rsp->hdr.ProtocolId + sz, spnego_blob, spnego_blob_len);
+		memcpy(rsp->Buffer, spnego_blob, spnego_blob_len);
 		rsp->SecurityBufferLength = cpu_to_le16(spnego_blob_len);
 		kfree(spnego_blob);
 	}
@@ -1610,20 +1653,18 @@ static int krb5_authenticate(struct ksmbd_work *work,
 	out_len = work->response_sz -
 		(le16_to_cpu(rsp->SecurityBufferOffset) + 4);
 
-	/* Check previous session */
-	prev_sess_id = le64_to_cpu(req->PreviousSessionId);
-	if (prev_sess_id && prev_sess_id != sess->id)
-		destroy_previous_session(conn, sess->user, prev_sess_id);
-
-	if (sess->state == SMB2_SESSION_VALID)
-		ksmbd_free_user(sess->user);
-
 	retval = ksmbd_krb5_authenticate(sess, in_blob, in_len,
 					 out_blob, &out_len);
 	if (retval) {
 		ksmbd_debug(SMB, "krb5 authentication failed\n");
 		return -EINVAL;
 	}
+
+	/* Check previous session */
+	prev_sess_id = le64_to_cpu(req->PreviousSessionId);
+	if (prev_sess_id && prev_sess_id != sess->id)
+		destroy_previous_session(conn, sess->user, prev_sess_id);
+
 	rsp->SecurityBufferLength = cpu_to_le16(out_len);
 
 	if ((conn->sign || server_conf.enforced_signing) ||
@@ -2689,7 +2730,7 @@ int smb2_open(struct ksmbd_work *work)
 	int req_op_level = 0, open_flags = 0, may_flags = 0, file_info = 0;
 	int rc = 0;
 	int contxt_cnt = 0, query_disk_id = 0;
-	int maximal_access_ctxt = 0, posix_ctxt = 0;
+	bool maximal_access_ctxt = false, posix_ctxt = false;
 	int s_type = 0;
 	int next_off = 0;
 	char *name = NULL;
@@ -2716,6 +2757,27 @@ int smb2_open(struct ksmbd_work *work)
 		return create_smb2_pipe(work);
 	}
 
+	if (req->CreateContextsOffset && tcon->posix_extensions) {
+		context = smb2_find_context_vals(req, SMB2_CREATE_TAG_POSIX, 16);
+		if (IS_ERR(context)) {
+			rc = PTR_ERR(context);
+			goto err_out2;
+		} else if (context) {
+			struct create_posix *posix = (struct create_posix *)context;
+
+			if (le16_to_cpu(context->DataOffset) +
+				le32_to_cpu(context->DataLength) <
+			    sizeof(struct create_posix) - 4) {
+				rc = -EINVAL;
+				goto err_out2;
+			}
+			ksmbd_debug(SMB, "get posix context\n");
+
+			posix_mode = le32_to_cpu(posix->Mode);
+			posix_ctxt = true;
+		}
+	}
+
 	if (req->NameLength) {
 		if ((req->CreateOptions & FILE_DIRECTORY_FILE_LE) &&
 		    *(char *)req->Buffer == '\\') {
@@ -2735,7 +2797,8 @@ int smb2_open(struct ksmbd_work *work)
 			goto err_out2;
 		}
 
-		ksmbd_debug(SMB, "converted name = %s\n", name);
+		ksmbd_debug(SMB, "converted name = *%s\n",
+			    get_last_three_chars(get_extract((const char *)name)));
 		if (strchr(name, ':')) {
 			if (!test_share_config_flag(work->tcon->share_conf,
 						    KSMBD_SHARE_FLAG_STREAMS)) {
@@ -2747,9 +2810,11 @@ int smb2_open(struct ksmbd_work *work)
 				goto err_out2;
 		}
 
-		rc = ksmbd_validate_filename(name);
-		if (rc < 0)
-			goto err_out2;
+		if (posix_ctxt == false) {
+			rc = ksmbd_validate_filename(name);
+			if (rc < 0)
+				goto err_out2;
+		}
 
 		if (ksmbd_share_veto_filename(share, name)) {
 			rc = -ENOENT;
@@ -2864,28 +2929,6 @@ int smb2_open(struct ksmbd_work *work)
 			rc = -EBADF;
 			goto err_out2;
 		}
-
-		if (tcon->posix_extensions) {
-			context = smb2_find_context_vals(req,
-							 SMB2_CREATE_TAG_POSIX, 16);
-			if (IS_ERR(context)) {
-				rc = PTR_ERR(context);
-				goto err_out2;
-			} else if (context) {
-				struct create_posix *posix =
-					(struct create_posix *)context;
-				if (le16_to_cpu(context->DataOffset) +
-				    le32_to_cpu(context->DataLength) <
-				    sizeof(struct create_posix) - 4) {
-					rc = -EINVAL;
-					goto err_out2;
-				}
-				ksmbd_debug(SMB, "get posix context\n");
-
-				posix_mode = le32_to_cpu(posix->Mode);
-				posix_ctxt = 1;
-			}
-		}
 	}
 
 	if (ksmbd_override_fsids(work)) {
@@ -2925,8 +2968,8 @@ int smb2_open(struct ksmbd_work *work)
 	} else {
 		if (rc != -ENOENT)
 			goto err_out;
-		ksmbd_debug(SMB, "can not get linux path for %s, rc = %d\n",
-			    name, rc);
+		ksmbd_debug(SMB, "can not get linux path for *%s, rc = %d\n",
+			    get_last_three_chars(get_extract((const char *)name)), rc);
 		rc = 0;
 	}
 
@@ -3248,7 +3291,7 @@ int smb2_open(struct ksmbd_work *work)
 			goto err_out1;
 		}
 	} else {
-		if (req_op_level == SMB2_OPLOCK_LEVEL_LEASE) {
+		if (req_op_level == SMB2_OPLOCK_LEVEL_LEASE && lc) {
 			/*
 			 * Compare parent lease using parent key. If there is no
 			 * a lease that has same parent key, Send lease break
@@ -4606,7 +4649,7 @@ static int get_file_all_info(struct ksmbd_work *work,
 	inode = file_inode(fp->filp);
 	generic_fillattr(file_mnt_user_ns(fp->filp), inode, &stat);
 
-	ksmbd_debug(SMB, "filename = %s\n", filename);
+	ksmbd_debug(SMB, "filename = *%s\n", get_last_three_chars(get_extract((const char *)filename)));
 	delete_pending = ksmbd_inode_pending_delete(fp);
 	file_info = (struct smb2_file_all_info *)rsp->Buffer;
 
@@ -5624,7 +5667,8 @@ static int smb2_rename(struct ksmbd_work *work,
 		goto out;
 	}
 
-	ksmbd_debug(SMB, "new name %s\n", new_name);
+	ksmbd_debug(SMB, "new name *%s\n",
+		    get_last_three_chars(get_extract((const char *)new_name)));
 	if (ksmbd_share_veto_filename(share, new_name)) {
 		rc = -ENOENT;
 		ksmbd_debug(SMB, "Can't rename vetoed file: %s\n", new_name);
@@ -6402,8 +6446,8 @@ int smb2_read(struct ksmbd_work *work)
 		goto out;
 	}
 
-	ksmbd_debug(SMB, "filename %pD, offset %lld, len %zu\n",
-		    fp->filp, offset, length);
+	ksmbd_debug(SMB, "filename *%s, offset %lld, len %zu\n",
+		    get_last_three_chars(get_filename(fp->filp)), offset, length);
 
 	aux_payload_buf = kvzalloc(length, GFP_KERNEL);
 	if (!aux_payload_buf) {
@@ -6672,8 +6716,8 @@ int smb2_write(struct ksmbd_work *work)
 		data_buf = (char *)(((char *)&req->hdr.ProtocolId) +
 				    le16_to_cpu(req->DataOffset));
 
-		ksmbd_debug(SMB, "filename %pD, offset %lld, len %zu\n",
-			    fp->filp, offset, length);
+		ksmbd_debug(SMB, "filename *%s, offset %lld, len %zu\n",
+			    get_last_three_chars(get_filename(fp->filp)), offset, length);
 		err = ksmbd_vfs_write(work, fp, data_buf, length, &offset,
 				      writethrough, &nbytes);
 		if (err < 0)

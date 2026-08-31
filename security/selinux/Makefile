@@ -17,6 +17,7 @@ selinux-$(CONFIG_NETLABEL) += netlabel.o
 selinux-$(CONFIG_SECURITY_INFINIBAND) += ibpkey.o
 
 selinux-$(CONFIG_IMA) += ima.o
+selinux-$(CONFIG_SECURITY_SEATD) += sea_signal.o sea_hash.o sea_netlink.o
 
 ccflags-y := -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
 
