@@ -128,6 +128,12 @@ struct cred_kdp_init {
 #define PROTECT_INIT 1
 #define PROTECT_KMEM 2
 
+#if defined(MODULE)
+#define GET_ROCRED_RCU(cred) \
+( \
+		&(((struct cred_kdp_init *)((struct cred_kdp *)cred)->use_cnt)->ro_rcu_head_init) \
+)
+#else
 #define GET_ROCRED_RCU(cred) \
 ( \
 	((u64)cred == (u64)&init_cred)? \
@@ -137,6 +143,7 @@ struct cred_kdp_init {
 
 extern struct cred init_cred;
 extern struct cred_kdp init_cred_kdp;
+#endif
 extern struct task_security_struct init_sec;
 struct filename;
 
@@ -149,10 +156,13 @@ extern inline void set_cred_subscribers(struct cred *cred, int n);
 extern void put_rocred_rcu(struct rcu_head *rcu);
 extern void kdp_put_cred_rcu(struct cred *cred, void *put_cred_rcu);
 extern unsigned int kdp_get_usecount(struct cred *cred);
-extern void kdp_usecount_inc(struct cred *cred);
 extern unsigned int kdp_usecount_inc_not_zero(struct cred *cred);
+
+#if !defined(MODULE)
+extern void kdp_usecount_inc(struct cred *cred);
 extern unsigned int kdp_usecount_dec_and_test(struct cred *cred);
 extern void kdp_set_cred_non_rcu(struct cred *cred, int val);
+#endif
 
 // linux/cred.h
 extern int security_integrity_current(void);

@@ -233,6 +233,24 @@ static inline bool cap_ambient_invariant_ok(const struct cred *cred)
 					  cred->cap_inheritable));
 }
 
+#if defined(CONFIG_KDP_CRED) && defined(MODULE)
+/* Kernel modules do not have access to the implementations in kdp.c.
+ * So, we define these variants for modules here
+ */
+static inline void kdp_usecount_inc(struct cred *cred)
+{
+	atomic_inc(((struct cred_kdp *)cred)->use_cnt);
+}
+static inline unsigned int kdp_usecount_dec_and_test(struct cred *cred)
+{
+	return (unsigned int)atomic_dec_and_test(((struct cred_kdp *)cred)->use_cnt);
+}
+static inline void kdp_set_cred_non_rcu(struct cred *cred, int val)
+{
+	GET_ROCRED_RCU(cred)->non_rcu = val;
+}
+#endif
+
 /**
  * get_new_cred - Get a reference on a new set of credentials
  * @cred: The new credentials to reference
@@ -317,6 +335,22 @@ static inline void put_cred(const struct cred *_cred)
 		validate_creds(cred);
 #ifdef CONFIG_KDP_CRED
 		if (kdp_usecount_dec_and_test(cred))
+			__put_cred(cred);
+#else
+		if (atomic_dec_and_test(&(cred)->usage))
+			__put_cred(cred);
+#endif
+	}
+}
+
+static inline void put_cred_module(const struct cred *_cred)
+{
+	struct cred *cred = (struct cred *) _cred;
+
+	if (cred) {
+		validate_creds(cred);
+#ifdef CONFIG_KDP_CRED
+		if (atomic_dec_and_test(((struct cred_kdp *)cred)->use_cnt))
 			__put_cred(cred);
 #else
 		if (atomic_dec_and_test(&(cred)->usage))
