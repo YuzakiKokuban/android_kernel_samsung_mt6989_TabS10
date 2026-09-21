@@ -18,5 +18,6 @@ jobs:
               "project": "tabs10_mt6989",
               "branch": "${{ github.ref_name }}",
               "apply_susfs": true,
-              "apply_bbg": false
+              "apply_bbg": false,
+              "apply_hybridmount": true
             }
